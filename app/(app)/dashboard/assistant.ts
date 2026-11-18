@@ -113,7 +113,7 @@ async function llmParse(msg: string, names: string[]): Promise<Intent | null> {
   const ai = aiConfig();
   if (!ai) return null;
   try {
-    const { text } = await aiChat({ json: true, temperature: 0, maxTokens: 400, timeoutMs: 15000,
+    const { text } = await aiChat({ feature: "dashboard", json: true, temperature: 0, maxTokens: 400, timeoutMs: 15000,
       system: `You help the DR Fitout admin update CRM leads. Return JSON {"kind":"call_status"|"call_note"|"attempt"|"lead_stage"|"lead_note"|"followup"|"remind"|"none","target":name,"status"?:one of ${JSON.stringify(CALL_STATUSES)},"stage"?:one of ${JSON.stringify(ALL_STAGES)},"note"?:string,"n"?:int,"date"?: "YYYY-MM-DD","due"?:string,"quote"?:boolean}. Known names: ${JSON.stringify(names.slice(0, 250))}. Spelling: DR Fitout (singular). If unclear return {"kind":"none"}.`,
       messages: [{ role: "user", content: msg }] });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -3,8 +3,8 @@
 // request header Authorization: Bearer <CLAUDE_CONNECTOR_KEY>. See docs/CLAUDE_CONNECTOR.md.
 // Claude can read everything and create / change records. It can't delete, change the software, or touch logins.
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
-import { agentAuthError, agentAudit, createRow, getRow, listRows, overview, updateRow, RESOURCES } from "@/lib/agent-api";
+import { agentAuthError, CLAUDE, RESOURCES } from "@/lib/agent-api";
+import { runTool } from "@/lib/agent-tools";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,56 +46,6 @@ const TOOLS: Tool[] = [
     description: "Pull the latest bank, invoices, bills and P&L from Xero now." },
 ];
 
-async function callTool(name: string, a: Record<string, unknown>): Promise<unknown> {
-  const s = (k: string) => String(a[k] ?? "");
-  switch (name) {
-    case "crm_overview": return overview();
-    case "crm_list": return listRows(s("table"), a as never);
-    case "crm_get": return getRow(s("table"), s("id"));
-    case "crm_create": return createRow(s("table"), (a.data ?? {}) as Record<string, unknown>, a.dryRun !== false);
-    case "crm_update": return updateRow(s("table"), s("id"), (a.data ?? {}) as Record<string, unknown>, a.dryRun !== false);
-    case "crm_lease_dates": {
-      const { keyDates } = await import("@/lib/leases");
-      const days = Math.min(730, Math.max(1, Number(a.days) || 180));
-      const leases = await prisma.lease.findMany({ include: { client: { select: { name: true } } } });
-      return { dates: leases.flatMap((l) => keyDates(l).map((d) => ({ ...d, premises: [l.tenancy, l.premises].filter(Boolean).join(", "), client: l.client?.name ?? null, stage: l.status })))
-        .filter((d) => d.days >= -30 && d.days <= days).sort((x, y) => x.date.localeCompare(y.date)) };
-    }
-    case "crm_wip": {
-      const { liveJobs, wipFor } = await import("@/lib/wip");
-      const { claimPlan } = await import("@/lib/claim-timing");
-      const today = new Date().toISOString().slice(0, 10);
-      return { jobs: (await liveJobs("DR", true)).map((j) => { const w = wipFor(j); return {
-        id: j.id, name: j.name, jobNumber: j.jobNumber, status: j.status, client: j.client, contract: j.contractValue, start: j.startDate, finish: j.finishDate,
-        progress: w.progress, daysLate: w.daysLate, claimed: w.claimedEx, receivedInc: w.receivedInc, owedInc: w.owedInc, costs: w.costTotal, paid: w.paidTotal,
-        forecastGp: w.forecastGp, actual: { income: w.actual.income, costs: w.actual.costs, profit: w.actual.profit, pct: w.actual.pct }, flags: w.flags.map((f) => `${f.level}: ${f.text}`),
-        claims: claimPlan(j, today).map((p) => ({ seq: p.seq, name: p.name, pct: p.pct, amountInc: p.amountInc, state: p.state, issueOn: p.issueOn })),
-      }; }) };
-    }
-    case "crm_accounts": {
-      const { accountsView } = await import("@/lib/accounts");
-      const v = await accountsView();
-      return { month: v.month, day: v.dayOfMonth, bank: v.bank, cashTotal: v.cashTotal, freeToSpend: v.freeToSpend, income: v.income, gross: v.gross, net: v.net, liveThis: v.liveThis, liveLast: v.liveLast,
-        receivablesTotal: v.recvTotal, aged: v.aged, billsDue30: v.billsDue30, signedThisMonth: v.signedThisMonth, forecast: v.weeks.map((w) => ({ weekOf: w.start, in: w.inn, out: w.out, balance: w.bal })) };
-    }
-    case "crm_concept_fit": {
-      const { runConceptFit } = await import("@/lib/concept-fit");
-      const fit = await runConceptFit(s("leaseId"), s("conceptId"), s("brief").slice(0, 2000), "Claude");
-      await prisma.lease.updateMany({ where: { id: s("leaseId"), status: "Enquiring" }, data: { status: "Concept proposing" } });
-      await agentAudit("concept fit", "Lease", s("leaseId"), `${s("conceptId")} → ${fit.status}`);
-      if (fit.status !== "done") throw new Error(fit.error ?? "The concept fit didn't work.");
-      return { fitId: fit.id, result: fit.result ? JSON.parse(fit.result) : null, view: `/leases/${s("leaseId")}?fit=${fit.id}` };
-    }
-    case "crm_refresh_xero": {
-      const conn = await prisma.xeroConnection.findUnique({ where: { id: "xero" } });
-      if (!conn) throw new Error("Xero isn't connected.");
-      const { syncXero } = await import("@/lib/xero");
-      return { notes: await syncXero() };
-    }
-  }
-  throw new Error(`Unknown tool ${name}`);
-}
-
 type Rpc = { jsonrpc?: string; id?: string | number | null; method?: string; params?: Record<string, unknown> };
 const ok = (id: Rpc["id"], result: unknown) => ({ jsonrpc: "2.0", id, result });
 const fail = (id: Rpc["id"], code: number, message: string) => ({ jsonrpc: "2.0", id: id ?? null, error: { code, message } });
@@ -118,7 +68,7 @@ async function handle(m: Rpc): Promise<unknown | null> {
       const name = String(m.params?.name ?? "");
       if (!TOOLS.some((t) => t.name === name)) return fail(m.id, -32602, `Unknown tool: ${name}`);
       try {
-        const out = await callTool(name, (m.params?.arguments ?? {}) as Record<string, unknown>);
+        const out = await runTool(CLAUDE, name, (m.params?.arguments ?? {}) as Record<string, unknown>);
         const text = JSON.stringify(out, null, 1);
         return ok(m.id, { content: [{ type: "text", text: text.length > 200000 ? `${text.slice(0, 200000)}\n…(cut short: use limit/offset or a narrower where)` : text }], isError: false });
       } catch (e) {
@@ -133,7 +83,7 @@ async function handle(m: Rpc): Promise<unknown | null> {
 
 const headers = { "Cache-Control": "no-store" };
 export async function POST(req: Request) {
-  const denied = agentAuthError(req);
+  const denied = agentAuthError(req, CLAUDE);
   if (denied) return NextResponse.json(fail(null, -32001, denied.error), { status: denied.status, headers });
   const body = (await req.json().catch(() => null)) as Rpc | Rpc[] | null;
   if (!body) return NextResponse.json(fail(null, -32700, "Parse error"), { status: 400, headers });

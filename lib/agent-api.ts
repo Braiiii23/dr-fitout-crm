@@ -8,17 +8,21 @@ import { ensureJobForLead } from "./job-from-lead";
 
 // Claude's access to the CRM (the Claude connector at /api/mcp): read everything, create and change records like the admin would.
 // Not allowed: deleting anything, changing the software, logins/passwords (User), and the Xero / BuilderTrend connections and settings store.
-// Auth: Authorization: Bearer <CLAUDE_CONNECTOR_KEY>. Every change is recorded in the audit log as "claude".
+// Used by two doors: the Claude connector (/api/mcp, CLAUDE_CONNECTOR_KEY) and the Grok API (/api/grok, GROK_ADMIN_KEY).
+// Every change is recorded in the audit log as "claude" or "grok".
+export type Actor = { id: "claude" | "grok"; label: "Claude" | "Grok"; keyVar: "CLAUDE_CONNECTOR_KEY" | "GROK_ADMIN_KEY"; door: string };
+export const CLAUDE: Actor = { id: "claude", label: "Claude", keyVar: "CLAUDE_CONNECTOR_KEY", door: "The Claude connector" };
+export const GROK: Actor = { id: "grok", label: "Grok", keyVar: "GROK_ADMIN_KEY", door: "Grok access" };
 
-const hits: number[] = [];
+const hits: Record<string, number[]> = { claude: [], grok: [] };
 /** Checks the connector key. Returns an error message, or null when the request may go ahead. */
-export function agentAuthError(req: Request): { status: number; error: string } | null {
-  const key = process.env.CLAUDE_CONNECTOR_KEY ?? "";
-  if (key.length < 24) return { status: 503, error: "The Claude connector is switched off (CLAUDE_CONNECTOR_KEY isn't set)." };
+export function agentAuthError(req: Request, actor: Actor): { status: number; error: string } | null {
+  const key = process.env[actor.keyVar] ?? "";
+  if (key.length < 24) return { status: 503, error: `${actor.door} is switched off (${actor.keyVar} isn't set).` };
   const got = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim() || (req.headers.get("x-api-key") ?? "").trim();
   if (!got || !timingSafeEqual(createHash("sha256").update(got).digest(), createHash("sha256").update(key).digest())) return { status: 401, error: "Unauthorised" };
-  const now = Date.now(); while (hits.length && now - hits[0] > 60000) hits.shift(); hits.push(now);
-  if (hits.length > 240) return { status: 429, error: "Too many requests: slow down to 240 a minute." };
+  const h = hits[actor.id]; const now = Date.now(); while (h.length && now - h[0] > 60000) h.shift(); h.push(now);
+  if (h.length > 240) return { status: 429, error: "Too many requests: slow down to 240 a minute." };
   return null;
 }
 
@@ -29,8 +33,8 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
   leases: { model: "Lease", write: true, about: "Tenancies. status (stage): Enquiring | Concept proposing | Sign. Dates YYYY-MM-DD. files is managed by the app." },
   concepts: { model: "Concept", write: true, about: "Concept designs. rooms is JSON [{name, qty, areaSqm, notes}]. files is managed by the app." },
   "concept-fits": { model: "ConceptFit", write: false, about: "AI test fits of a concept onto a lease's floor plan (read only; run one with the concept_fit tool)" },
-  notices: { model: "Notice", write: true, about: "My Day notice board posts (category: Update | Progress | Win | Heads up | Site; link = in-app path like /leases/{id}). Posts show as from Claude." },
-  "notice-replies": { model: "NoticeReply", write: true, about: "Replies on notice board posts (noticeId + body). Show as from Claude." },
+  notices: { model: "Notice", write: true, about: "My Day notice board posts (category: Update | Progress | Win | Heads up | Site; link = in-app path like /leases/{id}). Posts show under your name (Claude or Grok)." },
+  "notice-replies": { model: "NoticeReply", write: true, about: "Replies on notice board posts (noticeId + body). Show under your name (Claude or Grok)." },
   directory: { model: "CallListItem", write: true, about: "The Directory: designers, leasing agents, landlords, clients and trades (business is always DR)" },
   "trade-quotes": { model: "TradeQuote", write: true, about: "Estimating: trade quotes on a lead's trade pack" },
   "scope-items": { model: "ScopeItem", write: true, about: "Estimating: scope of works items" },
@@ -59,7 +63,7 @@ const LOCKED: Record<string, string[]> = {
   Notice: ["authorId", "authorName", "auto"], NoticeReply: ["authorId", "authorName"],
 };
 /** Values Grok can't choose: this is a DR Fitout-only CRM. */
-export const FIXED: Record<string, Record<string, unknown>> = { Lead: { brand: "DR" }, Job: { brand: "DR" }, CallListItem: { business: "DR" }, Notice: { authorName: "Claude" }, NoticeReply: { authorName: "Claude" } };
+export const FIXED: Record<string, Record<string, unknown>> = { Lead: { brand: "DR" }, Job: { brand: "DR" }, CallListItem: { business: "DR" } };
 const ALWAYS_LOCKED = ["id", "createdAt", "updatedAt"];
 
 type Field = { name: string; kind: string; type: string; isRequired: boolean; isList: boolean; hasDefaultValue: boolean };
@@ -94,11 +98,11 @@ export function coerce(model: string, body: Record<string, unknown>, creating: b
 }
 
 /** Add text to the end of a notes field (never replacing it). */
-export function appendTo(existing: string | null | undefined, text: unknown) {
+export function appendTo(existing: string | null | undefined, text: unknown, by = "Claude") {
   const t = typeof text === "string" ? text.trim() : "";
   if (!t) return existing ?? null;
   const stamp = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Brisbane", day: "numeric", month: "short", year: "numeric" }).format(new Date());
-  return [existing?.trimEnd(), `${stamp} (Claude): ${t}`].filter(Boolean).join("\n\n");
+  return [existing?.trimEnd(), `${stamp} (${by}): ${t}`].filter(Boolean).join("\n\n");
 }
 const NOTES_FIELD: Record<string, string> = { Lead: "notes", CallListItem: "callNotes", Job: "notes", JobClaim: "notes", JobCostLine: "notes", JobBill: "notes", JobLabour: "notes", Client: "notes", Lease: "notes" };
 export const notesField = (model: string) => NOTES_FIELD[model] ?? null;
@@ -115,7 +119,7 @@ export async function afterWrite(model: string, id: string, before: Record<strin
   if (model === "CallListItem") await runCallAutomations(id);
 }
 
-export async function agentAudit(action: string, model: string, id: string | undefined, detail: string) { await audit("claude", action, model, id, detail.slice(0, 500)); }
+export async function agentAudit(actor: Actor, action: string, model: string, id: string | undefined, detail: string) { await audit(actor.id, action, model, id, detail.slice(0, 500)); }
 
 /** What changed, for the reply. */
 export function diff(before: Record<string, unknown> | null, after: Record<string, unknown>) {
@@ -131,11 +135,11 @@ export function diff(before: Record<string, unknown> | null, after: Record<strin
 // ---------- Operations (used by the MCP tools) ----------
 type Out = Record<string, unknown>;
 const lastLine = (e: unknown) => (e as Error).message.split("\n").slice(-1)[0];
-const table = (name: string) => { const r = RESOURCES[name]; if (!r) throw new Error(`Unknown table "${name}". Use crm_overview to see the tables.`); return r; };
+const table = (name: string) => { const r = RESOURCES[name]; if (!r) throw new Error(`Unknown table "${name}". The overview (crm_overview or GET /api/grok) lists the tables.`); return r; };
 
-export function overview(): Out {
+export function overview(actor: Actor): Out {
   return {
-    actingAs: "the admin, recorded in the audit log as \"claude\"", timezone: "Australia/Brisbane", business: "DR Fitout (medical / allied-health fitouts, Brisbane). Spelt \"DR Fitout\", singular.",
+    actingAs: `the admin, recorded in the audit log as "${actor.id}"`, timezone: "Australia/Brisbane", business: "DR Fitout (medical / allied-health fitouts, Brisbane). Spelt \"DR Fitout\", singular.",
     rules: ["No deleting anything.", "No changes to the software itself.", "No logins, passwords or user accounts.", "No Xero / BuilderTrend connection settings.", "DR Fitout only: brand is always DR.",
       "Read a record before changing it, and use dryRun first.", "Use appendNotes to add a dated note; it never replaces what's there.", "Money is ex GST unless a field says Inc. Dates are YYYY-MM-DD.", "Don't invent values: leave unknowns blank and say so."],
     tables: Object.fromEntries(Object.entries(RESOURCES).map(([name, r]) => [name, {
@@ -168,25 +172,26 @@ export async function getRow(name: string, id: string): Promise<Out> {
   return { row };
 }
 
-export async function createRow(name: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
+export async function createRow(actor: Actor, name: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
   const r = table(name);
   if (!r.write) throw new Error(`${name} is read only`);
   const { data, errors } = coerce(r.model, body, true);
   Object.assign(data, FIXED[r.model] ?? {});
+  if (r.model === "Notice" || r.model === "NoticeReply") data.authorName = actor.label;
   if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
   const nf = notesField(r.model);
-  if (nf && body.appendNotes) data[nf] = appendTo(data[nf] as string | null, body.appendNotes);
+  if (nf && body.appendNotes) data[nf] = appendTo(data[nf] as string | null, body.appendNotes, actor.label);
   if (errors.length) throw new Error(errors.join("; "));
   if (dryRun) return { dryRun: true, wouldCreate: data };
   try {
     const row = await delegate(r.model).create({ data });
     await afterWrite(r.model, row.id, null);
-    await agentAudit("create", r.model, row.id, Object.keys(data).join(", "));
+    await agentAudit(actor, "create", r.model, row.id, Object.keys(data).join(", "));
     return { created: await delegate(r.model).findUnique({ where: { id: row.id } }) };
   } catch (e) { throw new Error(`Couldn't create: ${lastLine(e)}`); }
 }
 
-export async function updateRow(name: string, id: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
+export async function updateRow(actor: Actor, name: string, id: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
   const r = table(name);
   if (!r.write) throw new Error(`${name} is read only`);
   const before = await delegate(r.model).findUnique({ where: { id } });
@@ -194,7 +199,7 @@ export async function updateRow(name: string, id: string, body: Record<string, u
   const { data, errors } = coerce(r.model, body, false);
   if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
   const nf = notesField(r.model);
-  if (body.appendNotes) { if (!nf) errors.push(`${name} has no notes field`); else data[nf] = appendTo((data[nf] as string | undefined) ?? before[nf], body.appendNotes); }
+  if (body.appendNotes) { if (!nf) errors.push(`${name} has no notes field`); else data[nf] = appendTo((data[nf] as string | undefined) ?? before[nf], body.appendNotes, actor.label); }
   if (errors.length) throw new Error(errors.join("; "));
   const changes = diff(before, data);
   if (dryRun) return { dryRun: true, changes };
@@ -202,7 +207,7 @@ export async function updateRow(name: string, id: string, body: Record<string, u
   try {
     await delegate(r.model).update({ where: { id }, data });
     await afterWrite(r.model, id, before);
-    await agentAudit("update", r.model, id, Object.keys(changes).join(", "));
+    await agentAudit(actor, "update", r.model, id, Object.keys(changes).join(", "));
     return { changes, row: await delegate(r.model).findUnique({ where: { id } }) };
   } catch (e) { throw new Error(`Couldn't save: ${lastLine(e)}`); }
 }

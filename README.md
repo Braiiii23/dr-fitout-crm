@@ -15,14 +15,17 @@ My Day · Calendar · Dashboard · Leads · Jobs · WIP · Estimating · Account
 - **Concepts** (`/concepts`): our concept library: room schedule (one per line, e.g. `6 x Consult room 12 sqm`), design intent, finishes, images/plans.
 - **Concept packages**: "Import a concept package" (Concepts page) — Claude reads an A3 package PDF (narrative, key design moves, room schedule,
   finishes, compliance) into a concept and keeps the cover, the concept floor plan page (kind "plan"), a render and the PDF. `lib/concept-import.ts`.
-  The GP and Allied Health packages ship in `seed/concepts/` and load on first start (`scripts/seed-concepts.ts`).
+  The GP, Allied Health and Kids Psychology packages ship in `seed/concepts/` and load on first start (`scripts/seed-concepts.ts`).
 - **AI concept fit** (lease page → Concept design): pick a concept; Claude reads the tenancy floor plan (PDF page 1 via `pdftoppm`, or PNG/JPG)
   plus the concept's own floor plan, and RECREATES the concept for the tenancy (keeps zoning, design moves, adjacencies, corridor widths and room sizes
   where it can): block plan, room schedule, verdict (Fits / Tight / Doesn't fit), changes, checks, assumptions. `lib/concept-fit.ts`; saved as `ConceptFit`.
   A starting point for the designer, not a buildable drawing.
 - **My Day notice board**: posts and replies for everyone (admin pins); the CRM auto-posts signed leads, leads to Quoting, lease stage moves, concept fits and imports. `Notice`, `NoticeReply`, `lib/notices.ts`.
-- **Claude**: `ANTHROPIC_API_KEY` powers the in-app AI (`lib/ai.ts`); `CLAUDE_CONNECTOR_KEY` turns on the Claude connector, a remote MCP server at `/api/mcp`
-  (`app/api/mcp/route.ts`, `lib/agent-api.ts`). See `docs/CLAUDE_CONNECTOR.md`. (Grok was replaced by Claude.)
+- **Claude = the brain inside the app.** `ANTHROPIC_API_KEY` (+ optional `CLAUDE_MODEL`, `CLAUDE_VISION_MODEL`). Every AI feature calls `aiChat()` in `lib/ai.ts`;
+  add new AI features there (AI_FEATURES list + one call). Calls are logged in the audit log as "claude-ai".
+- **Grok = user-like access from outside** to add data: REST API at `/api/grok` (`app/api/grok/[[...path]]/route.ts`), key `GROK_ADMIN_KEY`. See `docs/GROK_API.md`.
+- **Claude connector (optional)**: remote MCP server at `/api/mcp`, key `CLAUDE_CONNECTOR_KEY`. See `docs/CLAUDE_CONNECTOR.md`.
+  Both outside doors share `lib/agent-api.ts` + `lib/agent-tools.ts`: read everything, create/change, never delete, no users, no software changes; audit as "grok" / "claude".
 - **Clients** (`/clients`): practices. Leads, jobs and leases link to a client. "Create from N leads" makes clients from DR lead companies.
 - Removed from v60: setters, call lists, free slots, statements, team tasks, setter portal, consulting, ENP pipeline, setter pay.
 
@@ -37,7 +40,7 @@ ACCOUNTS: accounts, jobs, WIP, leases, clients. Concepts: ADMIN/CEO, BDM, PM, ES
 
 ## Setup
 1. `.env.example` → `.env` (never commit `.env`). Optional `MONTHLY_TARGET` (dashboard signed-work target, default 1000000).
-   For AI: `ANTHROPIC_API_KEY` (optionally `AI_MODEL`, `AI_VISION_MODEL`). For the Claude connector: `CLAUDE_CONNECTOR_KEY`.
+   Claude (in-app AI): `ANTHROPIC_API_KEY` (optionally `CLAUDE_MODEL`, `CLAUDE_VISION_MODEL`). Grok API: `GROK_ADMIN_KEY`. Claude connector: `CLAUDE_CONNECTOR_KEY`.
    PDF floor plans need `pdftoppm` (poppler-utils; already in the Dockerfile).
 2. `npm install && npx prisma generate && npx prisma db push`
 3. `npx next dev -p 3100` → http://localhost:3100/login

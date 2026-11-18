@@ -42,3 +42,4 @@ export async function saveTeamView(fd: FormData) {
   await audit(u.email, "team view access", "User", undefined, `accounts=${fd.get("accounts") === "on"}, setterPay=${fd.get("setterPay") === "on"}`);
   revalidatePath("/users");
 }
+

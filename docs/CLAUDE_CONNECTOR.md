@@ -1,14 +1,15 @@
 # Claude and the DR Fitout CRM
 
-Claude is connected two ways.
+Claude is the brain inside the app. Grok works on the CRM from outside like a user (docs/GROK_API.md).
 
 ## 1. Claude inside the app
 The Ask button, the Dashboard assistant, the **AI concept fit** (lease page → Concept design) and **Import a concept package** (Concepts page)
 all use Claude through the Anthropic API.
 - `ANTHROPIC_API_KEY` (from console.anthropic.com → API keys) — required.
-- `AI_MODEL` — optional, default `claude-sonnet-5-5`. `AI_VISION_MODEL` — optional model for reading floor plans and packages (e.g. `claude-opus-5-5` for the best plan reading; defaults to `AI_MODEL`).
+- `CLAUDE_MODEL` — optional, default `claude-sonnet-5-5`. `CLAUDE_VISION_MODEL` — optional model for reading floor plans and packages (e.g. `claude-opus-5-5` for the best plan reading; defaults to `CLAUDE_MODEL`).
+- New AI features plug into one function, `aiChat()` in `lib/ai.ts` (see the comment at the top of that file). Every call is logged in the audit log as "claude-ai".
 
-## 2. The Claude connector (Claude working on the CRM)
+## 2. The Claude connector (optional: Claude working on the CRM from claude.ai or Claude Code)
 A remote MCP server at `https://<your-crm-address>/api/mcp`. Add it once and Claude (claude.ai, the Claude apps, Claude Code) can work in the CRM.
 
 **Set up**

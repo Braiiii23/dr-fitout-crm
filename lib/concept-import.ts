@@ -35,7 +35,7 @@ export async function importConceptPackage(pdf: Buffer, fileName: string, by: st
     const pageText: string[] = [];
     for (let p = 1; p <= Math.min(pages, 40); p++) pageText.push((await run("pdftotext", ["-layout", "-f", String(p), "-l", String(p), join(dir, "in.pdf"), "-"], { maxBuffer: 20e6 })).stdout);
     // The concept floor plan page, and the first render page (cover is page 1).
-    const planPage = (pageText.findIndex((t, i) => i > 0 && /CONCEPT FLOOR PLAN/i.test(t) && !/CONTENTS/.test(t)) + 1) || Math.min(3, pages);
+    const planPage = (pageText.findIndex((t, i) => i > 0 && /^\s*\d+\s*\/\s*(CONCEPT\s+)?(\w+\s+)?FLOOR PLAN/im.test(t)) + 1) || (pageText.findIndex((t, i) => i > 0 && /FLOOR PLAN/i.test(t.slice(0, 400))) + 1) || Math.min(3, pages);
     const renderPage = (pageText.findIndex((t, i) => i > 2 && /RENDER/i.test(t.slice(0, 600))) + 1) || 0;
     const render = async (p: number, fmt: "png" | "jpeg", stem: string) => {
       await run("pdftoppm", [`-${fmt}`, "-f", String(p), "-l", String(p), "-scale-to", "1568", join(dir, "in.pdf"), join(dir, stem)], { timeout: 90000 });
@@ -47,7 +47,7 @@ export async function importConceptPackage(pdf: Buffer, fileName: string, by: st
     const text = pageText.map((t, i) => `===== PAGE ${i + 1} =====\n${t.replace(/[ \t]{3,}/g, "  ")}`).join("\n").slice(0, 120000);
     const parts: AiPart[] = [{ type: "text", text: `Package file: ${fileName}\n\n${text}\n\nThe image is the concept floor plan (page ${planPage}).` }];
     if (plan) parts.push({ type: "image", dataUrl: `data:image/png;base64,${plan.toString("base64")}` });
-    const { text: reply } = await aiChat({ system: SYSTEM, messages: [{ role: "user", content: parts }], json: true, vision: true, maxTokens: 6000, timeoutMs: 180000 });
+    const { text: reply } = await aiChat({ feature: "conceptImport", system: SYSTEM, messages: [{ role: "user", content: parts }], json: true, vision: true, maxTokens: 6000, timeoutMs: 180000 });
     const c = jsonFrom<{ name?: string; practiceType?: string; designedForSqm?: number | null; description?: string; finishes?: string; compliance?: string; tags?: string; rooms?: Room[] }>(reply);
 
     const files: StoredFile[] = [];

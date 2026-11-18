@@ -49,7 +49,7 @@ Reply with JSON matching exactly:
 
 export async function runConceptFit(leaseId: string, conceptId: string, brief: string, by: string) {
   const ai = aiConfig();
-  if (!ai) throw new Error("The AI isn't set up. Add ANTHROPIC_API_KEY (Claude) on the server.");
+  if (!ai) throw new Error("Claude isn't set up. Add ANTHROPIC_API_KEY on the server.");
   const [lease, concept] = await Promise.all([
     prisma.lease.findUnique({ where: { id: leaseId }, include: { client: { select: { name: true, type: true } } } }),
     prisma.concept.findUnique({ where: { id: conceptId } }),
@@ -82,9 +82,9 @@ export async function runConceptFit(leaseId: string, conceptId: string, brief: s
   const parts: AiPart[] = [{ type: "text", text }, { type: "image", dataUrl: planImg.dataUrl }];
   if (conceptImg) parts.push({ type: "image", dataUrl: conceptImg.dataUrl });
 
-  let result: FitResult | null = null; let error: string | null = null; let model = ai.visionModel;
+  let result: FitResult | null = null; let error: string | null = null; let model = "";
   try {
-    const r = await aiChat({ system: SYSTEM, messages: [{ role: "user", content: parts }], vision: true, json: true, maxTokens: 8000, timeoutMs: 180000 });
+    const r = await aiChat({ feature: "conceptFit", system: SYSTEM, messages: [{ role: "user", content: parts }], vision: true, json: true, maxTokens: 8000, timeoutMs: 180000 });
     model = r.model;
     result = clean(jsonFrom<FitResult>(r.text));
   } catch (e) { error = (e as Error).message.slice(0, 500); }
