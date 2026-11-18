@@ -121,7 +121,7 @@ export async function assistantContext(u: CurrentUser, path: string) {
     if (path.startsWith("/accounts") || path.startsWith("/dashboard")) parts.push(await accountsContext());
     if (!path.startsWith("/accounts")) parts.push(await leadsContext());
   }
-  if (["ADMIN", "BDM", "PM", "ACCOUNTS"].includes(u.role) && /^\/(leases|clients|dashboard|calendar)/.test(path)) parts.push(await leasesContext());
+  if (["ADMIN", "BDM", "PM", "ACCOUNTS"].includes(u.role) && /^\/(leases|clients|concepts|dashboard|calendar|myday)/.test(path)) parts.push(await leasesContext());
   return parts.join("\n\n").slice(0, 24000);
 }
 
@@ -134,6 +134,8 @@ async function leasesContext() {
     const next = keyDates(l, today).find((d) => d.days >= 0);
     return `- ${[l.tenancy, l.premises, l.suburb].filter(Boolean).join(", ")} | ${l.status} | client ${l.client?.name ?? "—"} | ${l.sizeSqm ?? "?"} sqm | rent ${l.rentPa ?? "?"}/yr, outgoings ${l.outgoingsPa ?? "?"}/yr | incentive ${l.incentive ?? 0} | expiry ${expiryOf(l) ?? "?"}${next ? ` | next: ${next.label} ${next.date}` : ""}`;
   });
+  const concepts = await prisma.concept.findMany({ where: { status: { not: "Archived" } }, select: { name: true, practiceType: true, minSqm: true, maxSqm: true, rooms: true, tags: true }, orderBy: { name: "asc" } });
+  const K = concepts.map((c) => { let n = 0; try { n = (JSON.parse(c.rooms ?? "[]") as { qty?: number }[]).reduce((a, r) => a + (r.qty ?? 1), 0); } catch {} return `- ${c.name} (${c.practiceType ?? "?"}, suits ${c.minSqm ?? "?"}–${c.maxSqm ?? "?"} m², ${n} rooms)${c.tags ? ` · ${c.tags}` : ""}`; });
   const C = clients.map((c) => `- ${c.name} (${c.type ?? "type ?"}, ${c.status}): ${c._count.leads} leads, ${c._count.jobs} jobs, ${c._count.leases} leases`);
-  return `LEASES (${leases.length}):\n${L.join("\n") || "none"}\n\nCLIENTS (${clients.length}):\n${C.join("\n") || "none"}`;
+  return `LEASES (${leases.length}):\n${L.join("\n") || "none"}\n\nCLIENTS (${clients.length}):\n${C.join("\n") || "none"}\n\nCONCEPT LIBRARY (${concepts.length}):\n${K.join("\n") || "none"}`;
 }
