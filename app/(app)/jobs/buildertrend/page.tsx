@@ -52,7 +52,7 @@ export default async function BuilderTrendPage() {
                 <td><form action={btLinkJob} className="acc-actions">
                   <input type="hidden" name="btName" value={u.name} /><input type="hidden" name="first" value={u.first} /><input type="hidden" name="last" value={u.last} />
                   <select name="jobId" className="input" defaultValue="" aria-label={`Link ${u.name}`}><option value="" disabled>Choose…</option><option value="new">Create a new job</option>{jobs.map((j) => <option key={j.id} value={j.id}>{j.name}{j.btJobName ? ` (now: ${j.btJobName})` : ""}</option>)}</select>
-                  <select name="brand" className="input" aria-label="Brand for a new job"><option value="ENP">ENP</option><option value="DR">DR Fitout</option></select>
+                  <input type="hidden" name="brand" value="DR" />
                   <button className="btn">Link</button>
                 </form></td></tr>
             ))}</tbody>

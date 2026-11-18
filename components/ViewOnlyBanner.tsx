@@ -7,7 +7,7 @@ import { isViewOnly, type AnyRole } from "@/lib/access";
  *  (Saves are refused on the server for these logins anyway; this keeps the page tidy.) */
 export default function ViewOnlyBanner({ role }: { role: AnyRole }) {
   const path = usePathname() || "/";
-  const own = path.startsWith("/team") || path.startsWith("/portal") || path.startsWith("/myday") || path.startsWith("/calendar");
+  const own = path.startsWith("/directory") || path.startsWith("/portal") || path.startsWith("/myday") || path.startsWith("/calendar");
   const viewOnly = role === "TEAM" ? !own : isViewOnly(role, path);
   useEffect(() => {
     if (role === "TEAM") return; // the team login's layout already marks the page

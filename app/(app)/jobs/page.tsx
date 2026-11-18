@@ -60,7 +60,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         <summary className="btn" style={{ width: "max-content" }}>+ New job</summary>
         <form action={saveJob} className="tp-form" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}>
           <label><span className="label">Job name</span><input name="name" className="input" required placeholder="e.g. Hecho En Mexico Robina" /></label>
-          <label><span className="label">Brand</span><select name="brand" className="input"><option value="ENP">ENP Fitouts</option><option value="DR">DR Fitout</option></select></label>
+          <input type="hidden" name="brand" value="DR" />
           <label><span className="label">Job number</span><input name="jobNumber" className="input" placeholder="898" /></label>
           <label><span className="label">Xero tracking</span><input name="xeroTracking" className="input" placeholder="HECH002" /></label>
           <label><span className="label">Client</span><input name="client" className="input" /></label>

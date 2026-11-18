@@ -183,7 +183,7 @@ export async function enqueueBraidenToConnect(call: {
     leadId: call.leadId,
     callId: call.id,
     company: call.company,
-    brand: call.business === "DR" ? "DR" : "ENP",
+    brand: "DR",
     source: "braiden-to-connect",
     createdBy,
   });

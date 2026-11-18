@@ -16,7 +16,7 @@ export async function audit(userEmail: string | null, action: string, entity: st
 export async function findCompanyDuplicates(tx: Tx, company: string | null | undefined, excludeLeadId?: string) {
   if (!norm(company)) return [];
   const today = brisbaneToday();
-  const leads = await tx.lead.findMany({ where: { brand: { in: ["ENP", "DR"] } }, select: { id: true, brand: true, leadName: true, company: true, dateReceived: true, createdAt: true } });
+  const leads = await tx.lead.findMany({ where: { brand: "DR" }, select: { id: true, brand: true, leadName: true, company: true, dateReceived: true, createdAt: true } });
   return leads.filter((l) => {
     if (l.id === excludeLeadId || norm(l.company) !== norm(company)) return false;
     const d = l.dateReceived ?? l.createdAt.toISOString().slice(0, 10);
@@ -184,7 +184,7 @@ export async function releaseSlot(callId: string) {
 
 /** Optional helper for the monthly routine: number each setter's wins (by Deposit Cleared Date) to set Setter Win #. */
 export async function recomputeWinNumbers() {
-  const leads = await prisma.lead.findMany({ where: { brand: { in: ["ENP", "DR"] }, setterId: { not: null }, depositClearedDate: { not: null } }, orderBy: [{ depositClearedDate: "asc" }, { createdAt: "asc" }] });
+  const leads = await prisma.lead.findMany({ where: { brand: "DR", setterId: { not: null }, depositClearedDate: { not: null } }, orderBy: [{ depositClearedDate: "asc" }, { createdAt: "asc" }] });
   const counter: Record<string, number> = {};
   for (const l of leads) {
     const n = (counter[l.setterId!] = (counter[l.setterId!] ?? 0) + 1);

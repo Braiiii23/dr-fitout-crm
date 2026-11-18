@@ -42,7 +42,7 @@ export default async function FinanceReport({ searchParams }: { searchParams: Pr
 
   // ----- sales pipeline from the CRM -----
   const leads = await prisma.lead.findMany({
-    where: { brand: { in: ["ENP", "DR"] }, cancelled: false },
+    where: { brand: "DR", cancelled: false },
     select: {
       stage: true, contractValue: true, quoteValue: true, signedDate: true, createdAt: true,
       estPlansAt: true, estScopeAt: true, estExcelAt: true, estRfqAt: true, estPrelimAt: true, estRfqRecAt: true, estProposalAt: true, estSentAt: true,

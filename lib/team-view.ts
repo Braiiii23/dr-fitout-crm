@@ -20,7 +20,7 @@ export async function setTeamView(v: TeamView) {
 export async function requireViewer(roles: Role[], area?: keyof TeamView): Promise<CurrentUser> {
   // The team login, and estimating / PMs / the foreman, can also look at these pages (view only).
   const u = await requireUser([...roles, "TEAM", "ESTIMATOR", "PM", "FOREMAN"]);
-  if (u.role === "TEAM" && area && !(await getTeamView())[area]) redirect("/team");
+  if (u.role === "TEAM" && area && !(await getTeamView())[area]) redirect("/directory");
   return u;
 }
 export const isViewer = (u: CurrentUser) => u.role === "TEAM";

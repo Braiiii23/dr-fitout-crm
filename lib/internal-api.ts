@@ -56,15 +56,11 @@ export type Brand = "ENP" | "DR" | "CONSULTING";
 export const BRAND_LABEL: Record<Brand, string> = { ENP: "ENP Fitouts", DR: "DR Fitout", CONSULTING: "Consulting" };
 export const BRAND_SLUG: Record<Brand, string> = { ENP: "enp", DR: "dr", CONSULTING: "consulting" };
 
-/** ENP | DR | CONSULTING from "ENP Fitouts", "DR Fitouts", "DR Fitout", "dr", "Consulting Leads"… */
+/** DR Fitout CRM: only DR leads. Accepts "DR", "DR Fitout", "DR Fitouts", "dr-fitout"; anything else is rejected. */
 export function normBrand(v: unknown): Brand | null {
   if (typeof v !== "string") return null;
   const s = v.trim().toLowerCase();
-  if (!s) return null;
-  if (s === "enp" || s.startsWith("enp")) return "ENP";
-  if (s === "dr" || s.startsWith("dr ") || s.startsWith("dr fitout") || s === "dr-fitout") return "DR";
-  if (s.startsWith("consult")) return "CONSULTING";
-  return null;
+  return s === "dr" || s.startsWith("dr ") || s.startsWith("dr fitout") || s === "dr-fitout" ? "DR" : null;
 }
 
 export function str(v: unknown): string | null | undefined {

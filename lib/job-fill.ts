@@ -56,7 +56,7 @@ export async function fillJobsMissingInfo(): Promise<FillResult[]> {
   const usedCodes = new Set(jobs.map((j) => j.xeroTracking).filter(Boolean) as string[]);
   const quotes = await snap<Quote>("quotes");
   const takenLeads = new Set(jobs.map((j) => j.leadId).filter(Boolean) as string[]);
-  const leads = await prisma.lead.findMany({ where: { brand: { in: ["ENP", "DR"] }, cancelled: false, stage: { in: ["Signed", "Quoting"] } }, select: { id: true, company: true, leadName: true, stage: true, contractValue: true, quoteValue: true, jobNumber: true } });
+  const leads = await prisma.lead.findMany({ where: { brand: "DR", cancelled: false, stage: { in: ["Signed", "Quoting"] } }, select: { id: true, company: true, leadName: true, stage: true, contractValue: true, quoteValue: true, jobNumber: true } });
 
   const out: FillResult[] = [];
   for (const job of needs) {

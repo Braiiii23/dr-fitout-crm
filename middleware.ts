@@ -26,18 +26,12 @@ export async function middleware(req: NextRequest) {
   const under = (p: string) => pathname === p || pathname.startsWith(p + "/");
   // My Day and the team calendar are for everyone (each person only ever edits their own).
   if (under("/myday") || under("/calendar")) return NextResponse.next();
-  // Team login: view-only access to most pages (each page and every save also checks the role on the server).
-  // Never: logins/passwords, the Xero connection, BuilderTrend settings, Accounts settings, or "new" forms.
-  if (effectiveRole === "TEAM") {
-    const never = under("/users") || under("/xero") || under("/jobs/buildertrend") || under("/accounts/settings") || /\/new$/.test(pathname);
-    const view = ["/dashboard", "/leads", "/calls", "/estimating", "/jobs", "/wip", "/slots", "/accounts", "/setters", "/statements"].some(under);
-    if (never) return NextResponse.redirect(new URL("/team", req.url));
-    if (view) { const ok = NextResponse.next(); ok.headers.set("X-Robots-Tag", "noindex, nofollow"); return ok; }
-  }
+  // DR Fitout only: the old ENP / consulting pipelines and the old team page go to their DR equivalents.
+  if (under("/leads") && !under("/leads/dr")) return NextResponse.redirect(new URL("/leads/dr", req.url));
+  if (under("/team")) return NextResponse.redirect(new URL("/directory", req.url));
   // Everything else: the access rules in lib/access.ts (pages and every save check the role again on the server).
   const ok = canOpen(effectiveRole, pathname);
   if (ok === false) return NextResponse.redirect(new URL(homeFor(effectiveRole), req.url));
-  if (effectiveRole === "SETTER" && pathname.startsWith("/team")) return NextResponse.redirect(new URL("/portal", req.url));
   const res = NextResponse.next();
   res.headers.set("X-Robots-Tag", "noindex, nofollow");
   return res;

@@ -18,7 +18,7 @@ export const LEAD_GROUPS: FieldGroup[] = [
     { key: "dateReceived", label: "Date Received", type: "date" }, { key: "lastContacted", label: "Last Contacted", type: "date" },
     { key: "nextFollowUp", label: "Next Follow-up", type: "date" }, { key: "appointment", label: "Appointment", type: "datetime" },
     { key: "appointmentHeld", label: "Appointment Held", type: "checkbox", brands: PIPE },
-    { key: "braidenWillQuote", label: "Braiden Will Quote", type: "checkbox", brands: PIPE },
+    { key: "braidenWillQuote", label: "Director Will Quote", type: "checkbox", brands: PIPE },
     { key: "quotedDate", label: "Quoted Date", type: "date", brands: PIPE }, { key: "signedDate", label: "Signed Date", type: "date", brands: PIPE },
     { key: "jobNumber", label: "Job Number (Buildertrend/Procore)", type: "text", brands: PIPE },
   ] },
@@ -36,17 +36,10 @@ export const LEAD_GROUPS: FieldGroup[] = [
     { key: "quoteValue", label: "Quote Value ex GST", type: "money", brands: PIPE },
     { key: "quoteIssuedDate", label: "Quote Issued Date", type: "date", brands: PIPE },
   ] },
-  { title: "Setter pay", brands: PIPE, financial: true, fields: [
-    { key: "setterId", label: "Setter", type: "setter" },
-    { key: "appointmentSetter", label: "Appointment Setter (legacy text)", type: "text" },
-    { key: "newClient", label: "New Client", type: "checkbox", help: "Required for the $150 quote fee" },
-    { key: "quotedSetter150", label: "Quoted (Setter $150) — legacy", type: "checkbox" },
+  { title: "Status", brands: PIPE, fields: [
+    { key: "newClient", label: "New Client", type: "checkbox" },
     { key: "depositClearedDate", label: "Deposit Cleared Date", type: "date" },
-    { key: "claim50PaidDate", label: "50% Claim Paid Date", type: "date", help: "$500k+ jobs: second bonus tranche" },
-    { key: "setterWinNo", label: "Setter Win #", type: "int", help: "7th win onwards pays 7.5%" },
-    { key: "holdbackReleasedDate", label: "Holdback Released Date", type: "date" },
     { key: "cancelled", label: "Cancelled", type: "checkbox" }, { key: "cancelledDate", label: "Cancelled Date", type: "date" },
-    { key: "setterFeePaid", label: "Setter Fee Paid", type: "checkbox" },
   ] },
   { title: "Notes", fields: [{ key: "notes", label: "My Notes", type: "textarea" }] },
 ];

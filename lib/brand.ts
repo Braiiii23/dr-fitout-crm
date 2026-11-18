@@ -1,7 +1,6 @@
 import "server-only";
-import { cookies } from "next/headers";
+/** This CRM is DR Fitout only. The brand type is kept so shared code keeps compiling. */
 export type BrandFilter = "ENP" | "DR" | "ALL";
 export async function getBrand(): Promise<BrandFilter> {
-  const v = (await cookies()).get("brand")?.value;
-  return v === "DR" || v === "ALL" ? v : "ENP";
+  return "DR";
 }

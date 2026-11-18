@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { BRANDS, STAGES, brandFromSlug } from "@/lib/constants";
-import { computeFees } from "@/lib/fees";
 import { fmtAUD } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { PageTitle, StageBadge } from "@/components/ui";
@@ -43,16 +42,16 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
       {view === "grid" ? (
         <div className="card overflow-x-auto p-0">
           <table className="table">
-            <thead><tr><th>Lead</th><th>Company</th><th>Stage</th><th>Source</th><th>Received</th><th>Next follow-up</th><th>Appointment</th><th>Setter</th>{brand !== "CONSULTING" && <th>Quote fee v2</th>}<th>Contract value</th></tr></thead>
+            <thead><tr><th>Lead</th><th>Company</th><th>Stage</th><th>Source</th><th>Received</th><th>Next follow-up</th><th>Appointment</th><th>Location</th><th>Quote value</th><th>Contract value</th></tr></thead>
             <tbody>
-              {leads.map((l) => { const f = computeFees(l); return (
+              {leads.map((l) => (
                 <tr key={l.id} className="hover:bg-slate-50">
                   <td><Link prefetch={false} className="font-medium brand-text hover:underline" href={`/leads/${slug}/${l.id}`}>{l.leadName || "(no name)"}</Link><div className="text-xs text-slate-500">{l.phone} {l.email}</div></td>
                   <td>{l.company}</td><td><StageBadge stage={l.stage} /></td><td>{l.leadSource}</td>
                   <td className="whitespace-nowrap">{fmtDate(l.dateReceived)}</td><td className="whitespace-nowrap">{fmtDate(l.nextFollowUp)}</td>
-                  <td className="whitespace-nowrap">{fmtDateTime(l.appointment)}</td><td>{l.setter?.name ?? l.appointmentSetter ?? ""}</td>
-                  {brand !== "CONSULTING" && <td>{fmtAUD(f.quoteFeeV2)}</td>}<td>{fmtAUD(l.contractValue)}</td>
-                </tr>); })}
+                  <td className="whitespace-nowrap">{fmtDateTime(l.appointment)}</td><td>{l.location}</td>
+                  <td>{fmtAUD(l.quoteValue)}</td><td>{fmtAUD(l.contractValue)}</td>
+                </tr>))}
               {!leads.length && <tr><td colSpan={10} className="py-8 text-center text-slate-500">No leads match.</td></tr>}
             </tbody>
           </table>

@@ -113,6 +113,9 @@ model Lead {
   estOtherCosts        Float?    // estimator: materials, own labour, site costs, prelims (ex GST), on top of trade quotes
   estContingencyPct    Float?    // estimator: contingency % on trade + other costs
   xeroContact          String?   // the client's contact name in Xero, when it isn't matched automatically
+  clientId             String?
+  client               Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  leases               Lease[]
   referredByCallId     String?
   referredByCall       CallListItem? @relation("ReferredBy", fields: [referredByCallId], references: [id])
   calls                CallListItem[] @relation("CallLead")
@@ -313,6 +316,8 @@ model Job {
   jobNumber     String?
   xeroTracking  String?                   // e.g. HECH002 (Xero tracking / project code)
   client        String?
+  clientId      String?
+  clientRec     Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
   contractValue Float    @default(0)      // ex GST, signed
   status        String   @default("Live") // Live | On hold | Complete
   startDate     String?                   // YYYY-MM-DD
@@ -576,4 +581,65 @@ model KpiEntry {
   note      String?
   createdAt DateTime @default(now())
   @@index([kpiId, date])
+}
+
+// ===================== DR Fitout: clients & leases =====================
+/// A DR Fitout client: usually a medical / allied-health practice. Leads, jobs and leases can link to it.
+model Client {
+  id          String   @id @default(cuid())
+  name        String                    // practice or business name
+  type        String?                   // GP clinic | Dental | Physio | Specialist | Allied health | Pharmacy | Imaging | Vet | Other
+  status      String   @default("Active") // Prospect | Active | Past
+  contactName String?
+  contactRole String?
+  phone       String?
+  email       String?
+  abn         String?
+  address     String?
+  website     String?
+  xeroContact String?
+  notes       String?
+  leads       Lead[]
+  jobs        Job[]
+  leases      Lease[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([name])
+}
+
+/// A tenancy we're helping a client secure, or one they already hold. Dates are YYYY-MM-DD (Brisbane).
+model Lease {
+  id               String   @id @default(cuid())
+  clientId         String?
+  client           Client?  @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  leadId           String?
+  lead             Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  premises         String                    // street address
+  tenancy          String?                   // shop / suite / level
+  suburb           String?
+  centre           String?                   // shopping centre or building name
+  sizeSqm          Float?
+  status           String   @default("Prospect") // Prospect | Negotiating | Heads of agreement | Signed | Current | Expired | Lost
+  landlord         String?
+  landlordContact  String?
+  leasingAgent     String?
+  agentContact     String?
+  commencementDate String?
+  expiryDate       String?
+  termYears        Float?
+  options          String?                   // e.g. "5 + 5"
+  optionNoticeDate String?                   // last day to exercise the next option
+  rentPa           Float?                    // base rent, $ per year ex GST
+  outgoingsPa      Float?                    // $ per year ex GST
+  reviewType       String?                   // Fixed 3% | CPI | Market | Other
+  nextReviewDate   String?
+  incentive        Float?                    // landlord fitout contribution $ ex GST
+  rentFreeMonths   Float?
+  permittedUse     String?
+  makeGood         String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@index([status])
+  @@index([expiryDate])
 }

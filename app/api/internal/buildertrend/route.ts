@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     report.jobs.created++;
     // A signed CRM lead for the same job (same job number, or same client) gets linked, so sales and WIP line up.
     const client = str(j.client, 200);
-    const candidates = jobNumber || client ? await prisma.lead.findMany({ where: { stage: "Signed", cancelled: false, brand: { in: ["ENP", "DR"] }, OR: [...(jobNumber ? [{ jobNumber }] : []), ...(client ? [{ company: client }] : [])] }, select: { id: true, company: true, brand: true, contractValue: true } }) : [];
+    const candidates = jobNumber || client ? await prisma.lead.findMany({ where: { stage: "Signed", cancelled: false, brand: "DR", OR: [...(jobNumber ? [{ jobNumber }] : []), ...(client ? [{ company: client }] : [])] }, select: { id: true, company: true, brand: true, contractValue: true } }) : [];
     const taken = new Set((await prisma.job.findMany({ where: { leadId: { in: candidates.map((c) => c.id) } }, select: { leadId: true } })).map((x) => x.leadId));
     const lead = candidates.find((c) => !taken.has(c.id)) ?? null;
     const contractFinal = contract ?? lead?.contractValue ?? null;
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
     if (!dry) {
       const created = await prisma.job.create({ data: {
         ...base, name, jobNumber, client: str(j.client, 200) ?? lead?.company ?? null, xeroTracking: str(j.xeroTracking, 40),
-        brand: lead?.brand === "DR" || /dr/i.test(str(j.brand, 20) ?? "") ? "DR" : "ENP", status: "Live", source: "buildertrend", leadId: lead?.id ?? null,
+        brand: "DR", status: "Live", source: "buildertrend", leadId: lead?.id ?? null,
         contractValue: contractFinal ?? 0,
         notes: [[`Created from BuilderTrend via Grok.`, str(j.address, 200) && `Site: ${str(j.address, 200)}`, missing.length ? `To check: ${missing.join(", ")}.` : null].filter(Boolean).join(" "), extraNotes(j)].filter(Boolean).join("\n"),
       } });

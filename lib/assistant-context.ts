@@ -1,4 +1,5 @@
 import "server-only";
+import { expiryOf, keyDates } from "./leases";
 import { prisma } from "./db";
 import type { CurrentUser } from "./auth";
 import { accountsView } from "./accounts";
@@ -58,7 +59,7 @@ async function estimatingContext(jobId: string | null) {
     }
   }
   const rows = await prisma.lead.findMany({
-    where: { brand: { in: ["ENP", "DR"] }, cancelled: false, stage: { in: ["Quoting", "Signed"] } },
+    where: { brand: "DR", cancelled: false, stage: { in: ["Quoting", "Signed"] } },
     select: {
       id: true, stage: true, company: true, leadName: true, quoteValue: true, contractValue: true, grossProfit: true, estOtherCosts: true, estContingencyPct: true, signedDate: true,
       estPlansAt: true, estScopeAt: true, estExcelAt: true, estRfqAt: true, estPrelimAt: true, estRfqRecAt: true, estProposalAt: true, estSentAt: true,
@@ -120,5 +121,19 @@ export async function assistantContext(u: CurrentUser, path: string) {
     if (path.startsWith("/accounts") || path.startsWith("/dashboard")) parts.push(await accountsContext());
     if (!path.startsWith("/accounts")) parts.push(await leadsContext());
   }
+  if (["ADMIN", "BDM", "PM", "ACCOUNTS"].includes(u.role) && /^\/(leases|clients|dashboard|calendar)/.test(path)) parts.push(await leasesContext());
   return parts.join("\n\n").slice(0, 24000);
+}
+
+/** Leases and clients: status, money and the next key date for each open lease. */
+async function leasesContext() {
+  const leases = await prisma.lease.findMany({ include: { client: { select: { name: true } } }, orderBy: { updatedAt: "desc" }, take: 80 });
+  const clients = await prisma.client.findMany({ select: { name: true, type: true, status: true, _count: { select: { leads: true, jobs: true, leases: true } } }, orderBy: { name: "asc" }, take: 120 });
+  const today = brisbaneToday();
+  const L = leases.map((l) => {
+    const next = keyDates(l, today).find((d) => d.days >= 0);
+    return `- ${[l.tenancy, l.premises, l.suburb].filter(Boolean).join(", ")} | ${l.status} | client ${l.client?.name ?? "—"} | ${l.sizeSqm ?? "?"} sqm | rent ${l.rentPa ?? "?"}/yr, outgoings ${l.outgoingsPa ?? "?"}/yr | incentive ${l.incentive ?? 0} | expiry ${expiryOf(l) ?? "?"}${next ? ` | next: ${next.label} ${next.date}` : ""}`;
+  });
+  const C = clients.map((c) => `- ${c.name} (${c.type ?? "type ?"}, ${c.status}): ${c._count.leads} leads, ${c._count.jobs} jobs, ${c._count.leases} leases`);
+  return `LEASES (${leases.length}):\n${L.join("\n") || "none"}\n\nCLIENTS (${clients.length}):\n${C.join("\n") || "none"}`;
 }

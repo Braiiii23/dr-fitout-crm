@@ -8,7 +8,7 @@ export function AdminAssistantChat({ name, brand }: { name: string; brand: "ENP"
   const [open, setOpen] = useState(true);
   const [msgs, setMsgs] = useState<Msg[]>([{
     from: "bot",
-    text: `Hi ${name}! I can update any lead or call — e.g. “mark Smith as no answer”, “set lead Acme stage to Quoting”, “follow-up on Jane to tomorrow”, “add note on Acme: sent capability statement”.`,
+    text: `Hi ${name}! I can update any DR lead — e.g. “set lead Acme stage to Quoting”, “follow-up on Jane to tomorrow”, “add note on Acme: sent capability statement”.`,
   }]);
   const [text, setText] = useState("");
   const [pending, start] = useTransition();
@@ -42,7 +42,7 @@ export function AdminAssistantChat({ name, brand }: { name: string; brand: "ENP"
             <input className="input" value={text} onChange={(e) => setText(e.target.value)} placeholder="e.g. set lead Acme stage to Quoting" maxLength={500} />
             <button className="btn" disabled={pending || !text.trim()}>Send</button>
           </form>
-          <p className="mt-1 text-[11px] text-slate-500">Admin scope: any lead/call (status, stage, notes, follow-ups, attempts). Jessie&apos;s portal assistant is unchanged.</p>
+          <p className="mt-1 text-[11px] text-slate-500">Admin scope: any DR lead (stage, notes, follow-ups).</p>
         </div>
       )}
     </div>

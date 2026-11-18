@@ -7,7 +7,7 @@ import KpiFields from "@/components/KpiFields";
 import { setKpiFor, setKpiForRole, removeKpi } from "./actions";
 
 const fmt = (k: { unit: string | null }, n: number) => (k.unit === "%" ? `${Math.round(n)}%` : k.unit === "$" ? `$${Math.round(n).toLocaleString("en-AU")}` : `${Math.round(n * 10) / 10}${k.unit ? ` ${k.unit}` : ""}`);
-const ROLE_ORDER: AnyRole[] = ["ADMIN", "CEO", "PM", "FOREMAN", "ESTIMATOR", "ACCOUNTS", "SETTER", "TEAM"];
+const ROLE_ORDER: AnyRole[] = ["ADMIN", "CEO", "BDM", "PM", "FOREMAN", "ESTIMATOR", "ACCOUNTS", "TEAM"];
 
 // Everyone's KPIs in one place: set, change or remove them, for one person or a whole role.
 export default async function KpisPage() {
@@ -29,7 +29,7 @@ export default async function KpisPage() {
       <section className="card acc-pad">
         <h2 className="est-h2" style={{ marginTop: 0 }}>Set a KPI for a whole role</h2>
         <form action={setKpiForRole} className="ev-form" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))" }}>
-          <label><span className="label">For</span><select name="role" className="input" defaultValue="SETTER"><option value="ALL">Everyone</option>{ROLE_ORDER.filter((r) => r !== "ADMIN").map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></label>
+          <label><span className="label">For</span><select name="role" className="input" defaultValue="BDM"><option value="ALL">Everyone</option>{ROLE_ORDER.filter((r) => r !== "ADMIN").map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></label>
           <KpiFields />
           <div className="ev-actions"><button className="btn">Set for everyone in that role</button></div>
         </form>

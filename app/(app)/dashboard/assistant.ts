@@ -210,7 +210,7 @@ export async function adminAssistantChat(message: string, brand: "ENP" | "DR" | 
     await prisma.callListItem.update({ where: { id: row.id }, data: { callStatus: intent.status } });
     const after = await runCallAutomations(row.id);
     await audit(u.email, `admin-assistant status → ${intent.status}`, "CallListItem", row.id);
-    revalidatePath("/dashboard"); revalidatePath("/calls"); revalidatePath("/portal"); revalidatePath("/team");
+    revalidatePath("/dashboard"); revalidatePath("/directory");
     return { ok: true, reply: `✓ Call ${label}: ${row.callStatus} → ${intent.status}.` + (intent.status === "Appointment Set" && !after.appointment ? " Book a slot if needed." : "") };
   }
 
@@ -227,7 +227,7 @@ export async function adminAssistantChat(message: string, brand: "ENP" | "DR" | 
     const line = `[${brisbaneToday()}] ${intent.note.trim()}`;
     await prisma.callListItem.update({ where: { id: row.id }, data: { callNotes: row.callNotes ? `${row.callNotes}\n${line}` : line } });
     await audit(u.email, "admin-assistant call note", "CallListItem", row.id);
-    revalidatePath("/dashboard"); revalidatePath("/calls"); revalidatePath("/portal");
+    revalidatePath("/dashboard");
     return { ok: true, reply: `✓ Call note on ${label}: “${intent.note.trim()}”.` };
   }
 
@@ -236,7 +236,7 @@ export async function adminAssistantChat(message: string, brand: "ENP" | "DR" | 
     const n = Math.min(5, Math.max(1, intent.n));
     await prisma.callListItem.update({ where: { id: row.id }, data: { attempts: { increment: n }, lastCalled: brisbaneToday() } });
     await audit(u.email, `admin-assistant +${n} attempt`, "CallListItem", row.id);
-    revalidatePath("/dashboard"); revalidatePath("/calls"); revalidatePath("/portal");
+    revalidatePath("/dashboard");
     return { ok: true, reply: `✓ Logged ${n} attempt${n === 1 ? "" : "s"} on ${label}.` };
   }
 

@@ -26,7 +26,7 @@ export async function saveJob(fd: FormData) {
   const id = s(fd, "id");
   if (u.role === "PM" && !id) return; // new jobs come from signed leads or Braiden
   const data = {
-    brand: s(fd, "brand") === "DR" ? "DR" : "ENP", name: s(fd, "name") ?? "Untitled job", jobNumber: s(fd, "jobNumber"), xeroTracking: s(fd, "xeroTracking"),
+    brand: "DR", name: s(fd, "name") ?? "Untitled job", jobNumber: s(fd, "jobNumber"), xeroTracking: s(fd, "xeroTracking"),
     client: s(fd, "client"), contractValue: n(fd, "contractValue") ?? 0, status: ["Live", "On hold", "Complete"].includes(s(fd, "status") ?? "") ? s(fd, "status")! : "Live",
     startDate: d(fd, "startDate"), finishDate: d(fd, "finishDate"), pm: s(fd, "pm"), notes: s(fd, "notes"),
     ...(fd.has("btJobName") ? { btJobName: s(fd, "btJobName") } : {}),

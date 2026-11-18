@@ -3,7 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 
 // Access for the external lead bot: a secret key in the Authorization header (Bearer <LEADBOT_API_KEY>).
-// It can only list free slots, add leads and book slots. Nothing else in the CRM is reachable with it.
+// It can only add and read leads. Nothing else in the CRM is reachable with it.
 const hits = new Map<string, number[]>();
 
 export function botAuth(req: Request): NextResponse | null {
@@ -28,4 +28,5 @@ export const json = (data: unknown, status = 200) => NextResponse.json(data, { s
 /** An ISO date-time (e.g. 2026-11-10T09:00:00+10:00) as a Date, or null. */
 export const when = (v: unknown) => { if (typeof v !== "string") return null; const d = new Date(v); return Number.isNaN(d.getTime()) ? null : d; };
 export const isoDate = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
-export const leadBrand = (v: unknown) => { const s = String(v ?? "").toUpperCase().replace(/\s+/g, ""); return s === "DR" || s === "DRFITOUT" ? "DR" : s === "CONSULTING" ? "CONSULTING" : s === "ENP" || s === "ENPFITOUTS" || s === "" ? "ENP" : null; };
+/** DR Fitout CRM: every lead the bot adds is a DR Fitout lead, whatever brand it sends. */
+export const leadBrand = (_v: unknown): "DR" => "DR";

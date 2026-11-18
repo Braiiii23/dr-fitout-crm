@@ -27,7 +27,7 @@ export function TaskFields({ t, compact }: { t?: Partial<Todo>; compact?: boolea
     <label><span className="label">Repeat</span><select name="recurrence" className="input" defaultValue={t?.recurrence ?? ""}>{REPEATS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}{t?.recurrence && !REPEATS.some(([k]) => k === t.recurrence) && <option value={t.recurrence}>{repeatLabel(t.recurrence)}</option>}</select></label>
     <label><span className="label">Priority</span><select name="priority" className="input" defaultValue={t?.priority ?? 4}><option value={1}>P1 (urgent)</option><option value={2}>P2 (high)</option><option value={3}>P3 (medium)</option><option value={4}>P4 (normal)</option></select></label>
     {!compact && <>
-      <label><span className="label">Project</span><input name="project" className="input" defaultValue={t?.project ?? ""} placeholder="e.g. ENP, Personal" list="task-projects" /></label>
+      <label><span className="label">Project</span><input name="project" className="input" defaultValue={t?.project ?? ""} placeholder="e.g. DR Fitout, Personal" list="task-projects" /></label>
       <label><span className="label">Section</span><input name="section" className="input" defaultValue={t?.section ?? ""} placeholder="e.g. Admin" /></label>
       <label className="ev-wide"><span className="label">Labels</span><input name="labels" className="input" defaultValue={t?.labels ?? ""} placeholder="comma separated, e.g. crm-follow-up, calls" /></label>
     </>}

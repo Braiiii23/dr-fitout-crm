@@ -59,9 +59,3 @@ export async function deleteLead(fd: FormData) {
   redirect(`/leads/${BRANDS[l.brand as BrandKey].slug}`);
 }
 
-export async function recomputeWins() {
-  await requireUser(["ADMIN", "BDM"]);
-  await recomputeWinNumbers();
-  revalidatePath("/setters");
-  redirect("/setters?msg=Setter+Win+%23+renumbered");
-}

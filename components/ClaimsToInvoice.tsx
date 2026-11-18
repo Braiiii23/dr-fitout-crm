@@ -30,7 +30,7 @@ export default async function ClaimsToInvoice() {
         <tbody>{rows.map(({ j, p, claim }) => (
           <tr key={p.claimId} className={p.issueOn! <= today ? "is-bad" : ""}>
             <td><b>{p.issueOn! <= today ? (p.issueOn! < today ? `Overdue (${dm(p.issueOn)})` : "Today") : dm(p.issueOn)}</b></td>
-            <td>{j.name}<small className="acc-muted" style={{ display: "block" }}>{j.brand === "DR" ? "DR Fitout" : "ENP"}{j.jobNumber ? ` · job ${j.jobNumber}` : ""}{j.xeroTracking ? ` · ${j.xeroTracking}` : ""}</small></td>
+            <td>{j.name}<small className="acc-muted" style={{ display: "block" }}>{j.jobNumber ? `Job ${j.jobNumber}` : ""}{j.xeroTracking ? ` · ${j.xeroTracking}` : ""}</small></td>
             <td>Claim {p.seq}: {p.name}<small className="acc-muted" style={{ display: "block" }}>{p.pct}% · {aud(p.amount)} ex GST</small></td>
             <td><b>{aud(p.amountInc)}</b></td>
             <td><small>{p.basis}</small>{p.tasks.length > 0 && <small className="acc-muted" style={{ display: "block" }}>{p.tasks.slice(0, 4).map((t) => `${t.name} ${t.done ? "✓" : dm(t.finish)}`).join(" · ")}</small>}</td>

@@ -40,8 +40,8 @@ async function tokenRequest(body: Record<string, string>) {
   if (!res.ok) {
     const body = await res.text();
     if (/invalid_grant|invalid_client|unauthorized_client/.test(body)) throw new NeedsReconnect(/different client/.test(body)
-      ? "The saved Xero connection belongs to a different Xero app. Press Reconnect Xero and approve ENP Fitouts again."
-      : "Xero has ended this connection (it was revoked, or not used for 60 days). Press Reconnect Xero and approve ENP Fitouts again.");
+      ? "The saved Xero connection belongs to a different Xero app. Press Reconnect Xero and approve DR Fitout again."
+      : "Xero has ended this connection (it was revoked, or not used for 60 days). Press Reconnect Xero and approve DR Fitout again.");
     throw new Error(`Xero sign-in failed (${res.status}): ${body.slice(0, 200)}`);
   }
   return (await res.json()) as { access_token: string; refresh_token: string; expires_in: number; scope?: string };
@@ -53,8 +53,8 @@ export async function completeConnection(code: string, who: string) {
   const res = await fetch(`${API()}/connections`, { headers: { Authorization: `Bearer ${t.access_token}` }, signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`Couldn't list Xero organisations (${res.status})`);
   const orgs = ((await res.json()) as { tenantId: string; tenantName: string; tenantType: string }[]).filter((o) => o.tenantType === "ORGANISATION");
-  if (!orgs.length) throw new Error("No Xero organisation was approved. Connect again and tick ENP Fitouts.");
-  const org = orgs.find((o) => /enp/i.test(o.tenantName)) ?? orgs[0];
+  if (!orgs.length) throw new Error("No Xero organisation was approved. Connect again and tick DR Fitout.");
+  const org = orgs.find((o) => /\bdr\b|dr ?fitout/i.test(o.tenantName)) ?? orgs[0];
   const data = {
     tenantId: org.tenantId, tenantName: org.tenantName, accessToken: encrypt(t.access_token), refreshToken: encrypt(t.refresh_token),
     expiresAt: new Date(Date.now() + (t.expires_in - 60) * 1000), scopes: t.scope ?? null, connectedBy: who, lastSyncError: null,

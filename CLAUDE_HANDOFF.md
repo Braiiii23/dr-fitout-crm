@@ -1,37 +1,32 @@
-# ENP Fitouts · DR Fitout — Leads CRM (handoff for Claude)
+# DR Fitout CRM (handoff for Claude)
 
 ## What this is
-Private Next.js 15 CRM for ENP Fitouts (commercial fit-outs, Brisbane) and sister company **DR Fitout** (singular — never "DR Fitouts"). Replaces Airtable for leads, Jessie's setter portal, team call directory, and Braiden-only admin.
+Private Next.js 15 back-of-house CRM for **DR Fitout** (singular, never "DR Fitouts"): medical and allied-health fitouts, Brisbane.
+Built from the ENP/DR Leads CRM v60, locked to DR Fitout only (DR lavender/purple theme everywhere, no brand switch).
+
+## Tabs (menu order)
+My Day · Calendar · Dashboard · Leads · Jobs · WIP · Estimating · Accounts · Leases · Clients · Directory · KPI's · Users
+- Leads live at `/leads/dr` (`/leads`, `/leads/enp`, `/leads/consulting` redirect there). `/team` redirects to `/directory`.
+- **Leases** (`/leases`): tenancies we're securing for clients or that they hold. Status, premises, landlord/agent, term, options,
+  option-notice / review / expiry dates, rent, outgoings, incentive. Key dates show on the Leases page, Dashboard, team Calendar and the assistant.
+- **Clients** (`/clients`): practices. Leads, jobs and leases link to a client. "Create from N leads" makes clients from DR lead companies.
+- Removed from v60: setters, call lists, free slots, statements, team tasks, setter portal, consulting, ENP pipeline, setter pay.
 
 ## Stack
-- Next.js 15 (App Router) + TypeScript + Tailwind
-- Prisma + SQLite (`prisma/dev.db` may be included for demo data — regenerate with `npx prisma migrate` / seed if missing)
-- Port used in demo: **3100**
+Next.js 15 (App Router) + TypeScript + Tailwind, Prisma + SQLite. Port 3100.
+New Prisma models: `Client`, `Lease` (+ `clientId` on `Lead` and `Job`). `prisma db push` on start adds them.
+The `brand` column stays on leads/jobs (always "DR"); `lib/brand.ts` always returns DR. Setter/CallListItem tables are kept for the Directory.
 
-## Roles
-- **ADMIN** (Braiden): full dark admin dashboards, leads, calls, team, setters, slots, statements, users, AI assistant hooks
-- **SETTER** (Jessie): My Calls portal, earnings meter ($10k monthly net target), brand switch ENP/DR
-- **TEAM**: shared team call directory (claim contacts, no double-call)
-
-## Branding (locked)
-- ENP: black / white / red `#c8102e`
-- DR Fitout: lavender / purple `#5b2a86`
-- Admin: dark charcoal; setter: light company theme
-- Shared lock screen at `/login` for all portals; desktop split layout + separate phone CSS (`max-width: 767px`)
+## Roles (lib/access.ts)
+ADMIN/CEO everything. BDM: dashboard, leads, leases, clients, directory (+ estimating view). PM: jobs, WIP, leases, clients, directory (+ view rest).
+ACCOUNTS: accounts, jobs, WIP, leases, clients. ESTIMATOR: estimating (+ view rest). FOREMAN: directory (+ view rest). TEAM: directory + view-only.
 
 ## Setup
-1. Copy `.env.example` → `.env` and fill demo passwords / session secret (do **not** reuse production secrets from chat).
-2. `npm install`
-3. `npx prisma generate` && `npx prisma db push` (or migrate) && run seed if present (`npm run seed` / `npx tsx prisma/seed.ts` — check `package.json` scripts).
-4. `npx next dev -p 3100` → http://localhost:3100/login
+1. `.env.example` → `.env` (never commit `.env`). Optional `MONTHLY_TARGET` (dashboard signed-work target, default 1000000).
+2. `npm install && npx prisma generate && npx prisma db push`
+3. `npx next dev -p 3100` → http://localhost:3100/login
+Hosting: `Dockerfile` + `scripts/start.sh` (DB on a volume at `$DATA_DIR/crm.db`; first start copies `seed/initial.db`, which now holds DR data only).
 
 ## Do not
-- Publish publicly, buy domains, or connect client systems without Braiden's explicit OK
+- Publish publicly, buy domains, or connect client systems without the admin's explicit OK
 - Put passwords/keys in chat or commit `.env`
-- Spell the medical sister company as "DR Fitouts"
-
-## Related bots (Braiden's team)
-Anita Reminder (Todoist chase), Esther Mater (estimating), Phil McForms (docs), Leadardo / Lead Zeppelin (leads). Anita hooks: `docs/ANITA_REMINDER_HOOK.md`, queue under `data/anita-reminder-queue.jsonl` when present.
-
-## Origin
-Private codebase: `enp-fitouts/enp-dr-leads-crm` on Cursor Origin (PR may exist for latest sync).

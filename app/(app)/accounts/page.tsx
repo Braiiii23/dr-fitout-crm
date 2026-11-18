@@ -7,7 +7,6 @@ import { fmtAUD } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { refreshXero, disconnectXero, setJobXeroContact } from "./actions";
 import ClaimsToInvoice from "@/components/ClaimsToInvoice";
-import SetterPay from "@/components/SetterPay";
 import type { AccountsView } from "@/lib/accounts";
 
 const $ = (n: number) => fmtAUD(Math.round(n)).replace(/\.00$/, "");
@@ -83,7 +82,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       {!connected && (
         <section className="card acc-connect">
           <h2 className="est-h2" style={{ marginTop: 0 }}>Connect Xero</h2>
-          <p>Bank balances, bills, invoices and the profit and loss come from Xero. You&apos;ll sign in on Xero&apos;s own page and approve ENP Fitouts with read-only access. Nothing in Xero can be changed from here.</p>
+          <p>Bank balances, bills, invoices and the profit and loss come from Xero. You&apos;ll sign in on Xero&apos;s own page and approve DR Fitout with read-only access. Nothing in Xero can be changed from here.</p>
           {xeroConfigured() ? (
             <div className="acc-actions">
               <a className="btn" href="/xero/connect">Connect Xero</a>
@@ -134,8 +133,6 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
       </section>
 
       <SignedJobs v={v} />
-
-      <SetterPay />
 
       {connected && v.live && <LiveProfit v={v} />}
 

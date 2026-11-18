@@ -30,7 +30,7 @@ export async function btLinkJob(fd: FormData) {
   const name = String(fd.get("btName") ?? "").trim(); const jobId = String(fd.get("jobId") ?? "");
   if (!name) return;
   if (jobId === "new") {
-    const brand = String(fd.get("brand")) === "DR" ? "DR" : "ENP";
+    const brand = "DR";
     await prisma.job.create({ data: { name, btJobName: name, brand, status: "Live", startDate: String(fd.get("first") || "") || null, finishDate: String(fd.get("last") || "") || null, source: "buildertrend", notes: "Created from BuilderTrend's schedule. Add the contract value and claim split." } });
   } else if (jobId) {
     await prisma.job.update({ where: { id: jobId }, data: { btJobName: name } });

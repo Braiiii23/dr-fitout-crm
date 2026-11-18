@@ -36,7 +36,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
   const planOf = (id: string) => plan.find((p) => p.claimId === id);
   const xj = await lastXeroJobSync();
   const xr = xj?.jobs.find((x) => x.jobId === job.id);
-  const leadOpts = tab === "details" ? await prisma.lead.findMany({ where: { brand: { in: ["ENP", "DR"] }, cancelled: false, stage: { in: ["Signed", "Quoting"] } }, select: { id: true, company: true, leadName: true, stage: true, jobNumber: true }, orderBy: { updatedAt: "desc" }, take: 200 }) : [];
+  const leadOpts = tab === "details" ? await prisma.lead.findMany({ where: { brand: "DR", cancelled: false, stage: { in: ["Signed", "Quoting"] } }, select: { id: true, company: true, leadName: true, stage: true, jobNumber: true }, orderBy: { updatedAt: "desc" }, take: 200 }) : [];
   const tradeCount = job.leadId ? await prisma.tradeQuote.count({ where: { leadId: job.leadId } }) : 0;
   const lead = job.leadId ? await prisma.lead.findUnique({ where: { id: job.leadId }, select: { brand: true, grossProfit: true } }) : null;
   const lineOpts = job.costLines.map((l) => <option key={l.id} value={l.id}>{l.trade}</option>);
@@ -326,7 +326,7 @@ export default async function JobPage({ params, searchParams }: { params: Promis
           <h2 className="est-h2" style={{ marginTop: 0 }}>Job details</h2>
           <form action={saveJob} className="tp-form" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))" }}><input type="hidden" name="id" value={job.id} />
             <F label="Job name"><input name="name" className="input" defaultValue={job.name} /></F>
-            <F label="Brand"><select name="brand" className="input" defaultValue={job.brand}><option value="ENP">ENP Fitouts</option><option value="DR">DR Fitout</option></select></F>
+            <input type="hidden" name="brand" value="DR" />
             <F label="Job number"><input name="jobNumber" className="input" defaultValue={job.jobNumber ?? ""} /></F><F label="Xero tracking"><input name="xeroTracking" className="input" defaultValue={job.xeroTracking ?? ""} /></F>
             <F label="Client"><input name="client" className="input" defaultValue={job.client ?? ""} /></F><F label="Contract ex GST"><input name="contractValue" className="input" defaultValue={job.contractValue} readOnly={!isAdmin} title={isAdmin ? undefined : "Set by Braiden"} /></F>
             <F label="Status"><select name="status" className="input" defaultValue={job.status}>{["Live", "On hold", "Complete"].map((x) => <option key={x}>{x}</option>)}</select></F>

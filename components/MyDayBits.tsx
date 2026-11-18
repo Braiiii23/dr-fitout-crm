@@ -2,7 +2,6 @@ import Link from "next/link";
 import ActionForm from "./ActionForm";
 import { addDays, bneDateOf, bneTime, bneToday } from "@/lib/myday";
 import { saveEvent, deleteEvent } from "@/app/(app)/myday/actions";
-import { bookSlotAction } from "@/app/(app)/calls/actions";
 
 const PALETTE = ["#e11d48", "#2563eb", "#16a34a", "#d97706", "#7c3aed", "#0891b2", "#db2777", "#65a30d", "#ea580c", "#0d9488"];
 export const colourFor = (key: string) => PALETTE[[...key].reduce((t, c) => t + c.charCodeAt(0), 0) % PALETTE.length];
@@ -54,7 +53,7 @@ export function WeekCalendar({ week, items, baseHref, showWho, bookCalls }: { we
               <h3><span>{DOW[i]}</span> {dm(d)}</h3>
               {list.length === 0 && <p className="wk-empty">—</p>}
               {list.map((e) => (
-                <details key={e.id + d} className={`wk-ev ${e.slotId ? "wk-open" : ""}`} style={{ borderLeftColor: e.colour ?? "#c8102e" }}>
+                <details key={e.id + d} className={`wk-ev ${e.slotId ? "wk-open" : ""}`} style={{ borderLeftColor: e.colour ?? "#5b2a86" }}>
                   <summary>
                     <span className="wk-time">{e.allDay ? "All day" : `${bneTime(e.start)}–${bneTime(e.end)}`}</span>
                     <span className="wk-title">{e.title}</span>
@@ -64,13 +63,7 @@ export function WeekCalendar({ week, items, baseHref, showWho, bookCalls }: { we
                   <div className="wk-more">
                     {e.location && <p>📍 {e.location}</p>}
                     {e.notes && <p className="wk-notes">{e.notes}</p>}
-                    {e.slotId && bookCalls ? (bookCalls.length ? (
-                      <form action={bookSlotAction} className="wk-book">
-                        <input type="hidden" name="slotId" value={e.slotId} /><input type="hidden" name="setStatus" value="on" />
-                        <label><span className="label">Book this time for</span><select name="id" className="input" required>{bookCalls.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></label>
-                        <button className="btn">Book meeting</button>
-                      </form>) : <p className="acc-muted">You have no calls to book. Calls assigned to you appear here.</p>)
-                    : e.editable ? <EventForm e={e} /> : <p className="acc-muted">{e.tag === "Google" ? "From Google Calendar: edit it there." : e.tag === "Booked" ? "Booked through the call list." : e.tag === "Busy" ? "Not available." : ""}</p>}
+                    {e.editable ? <EventForm e={e} /> : <p className="acc-muted">{e.tag === "Google" ? "From Google Calendar: edit it there." : e.tag === "Booked" ? "Booked through the call list." : e.tag === "Busy" ? "Not available." : ""}</p>}
                   </div>
                 </details>
               ))}
@@ -119,7 +112,7 @@ export function MonthCalendar({ month, items, hrefFor, showWho, maxPerDay = 4 }:
   const on = (d: string) => items.filter((e) => bneDateOf(e.start) <= d && bneDateOf(new Date(e.end.getTime() - 1)) >= d)
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.getTime() - b.start.getTime());
   const Ev = ({ e }: { e: CalItem }) => (
-    <details className="mo-ev" style={{ ["--c" as string]: e.colour ?? "#c8102e" }}>
+    <details className="mo-ev" style={{ ["--c" as string]: e.colour ?? "#5b2a86" }}>
       <summary><i className="mo-dot" /><span className="mo-time">{e.allDay ? "All day" : bneTime(e.start)}</span> <span className="mo-title">{e.title}</span></summary>
       <div className="mo-pop">
         <b>{e.title}</b>

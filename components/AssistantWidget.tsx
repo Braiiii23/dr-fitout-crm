@@ -23,7 +23,7 @@ export default function AssistantWidget({ name }: { name: string }) {
   const [err, setErr] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs, busy, open]);
-  const key = path.startsWith("/accounts") ? "accounts" : path.startsWith("/estimating") ? "estimating" : path.startsWith("/portal") ? "portal" : path.startsWith("/team") ? "team" : "default";
+  const key = path.startsWith("/accounts") ? "accounts" : path.startsWith("/estimating") ? "estimating" : path.startsWith("/portal") ? "portal" : path.startsWith("/directory") ? "team" : "default";
 
   async function send(q: string) {
     const question = q.trim();

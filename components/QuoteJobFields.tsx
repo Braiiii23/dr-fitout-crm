@@ -8,7 +8,7 @@ export default function QuoteJobFields({ v = {}, isNew = false }: { v?: V; isNew
     <label className={wide ? "tp-wide" : undefined}><span className="label">{label}</span><input name={name} className="input" defaultValue={(v[name] as string | number | null | undefined) ?? ""} {...rest} /></label>
   );
   return (<>
-    <label><span className="label">Brand</span><select name="brand" className="input" defaultValue={v.brand === "DR" ? "DR" : "ENP"}><option value="ENP">ENP Fitouts</option><option value="DR">DR Fitout</option></select></label>
+    <input type="hidden" name="brand" value="DR" />
     <F name="company" label="Company / business" />
     <F name="leadName" label="Contact name" />
     <F name="phone" label="Phone" inputMode="tel" />

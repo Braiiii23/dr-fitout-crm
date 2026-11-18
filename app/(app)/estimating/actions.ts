@@ -90,7 +90,7 @@ async function sameCompany(company: string | null, exceptId?: string) {
 /** A new job to quote: goes straight onto the estimating board (stage Quoting) and into Braiden's leads. */
 export async function createQuoteJob(fd: FormData) {
   const u = await requireUser(["ADMIN", "ESTIMATOR"]);
-  const brand = txt(fd, "brand") === "DR" ? "DR" : "ENP";
+  const brand = "DR";
   const company = txt(fd, "company", 200), leadName = txt(fd, "leadName", 200);
   if (!company && !leadName) redirect(`/estimating?error=${encodeURIComponent("Add a company or a contact name.")}`);
   const dups = await sameCompany(company);
@@ -124,7 +124,7 @@ export async function updateQuoteDetails(fd: FormData) {
   const size = String(fd.get("sizeSqm") ?? "").trim() === "" ? null : Number(String(fd.get("sizeSqm")).replace(/[^0-9.]/g, ""));
   const data: Record<string, unknown> = Object.fromEntries(FIELDS.map((k) => [k, txt(fd, k, k === "lookingFor" ? 4000 : 300)]));
   if (!data.company && !data.leadName) return;
-  const brand = txt(fd, "brand") === "DR" ? "DR" : "ENP";
+  const brand = "DR";
   const changed = [...FIELDS, "sizeSqm", "brand"].filter((k) => {
     const before = (lead as Record<string, unknown>)[k];
     const after = k === "sizeSqm" ? (size && Number.isFinite(size) ? size : null) : k === "brand" ? brand : data[k];

@@ -16,6 +16,6 @@ export async function saveAvailabilityAction(fd: FormData) {
   await saveAvailability(next);
   const r = await syncAvailability();
   await audit(u.email, "booking availability", "Calendar", undefined, `${next.start}-${next.end}, ${next.length}min, ${r.open} open times`);
-  revalidatePath("/calendar"); revalidatePath("/portal");
+  revalidatePath("/calendar");
 }
-export async function rebuildAvailability() { await requireUser(["ADMIN"]); await syncAvailability(); revalidatePath("/calendar"); revalidatePath("/portal"); }
+export async function rebuildAvailability() { await requireUser(["ADMIN"]); await syncAvailability(); revalidatePath("/calendar"); }

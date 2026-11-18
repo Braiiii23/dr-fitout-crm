@@ -130,7 +130,7 @@ export async function accountsView() {
   const plSource = snaps.plThis?.ok ? "xero-report" : snaps.plThis?.note === "not-allowed" ? "worked-out" : plThis?.source ?? "none";
 
   // ----- CRM -----
-  const signed = await prisma.lead.findMany({ where: { stage: "Signed", contractValue: { gt: 0 }, brand: { in: ["ENP", "DR"] } }, select: { contractValue: true } });
+  const signed = await prisma.lead.findMany({ where: { stage: "Signed", contractValue: { gt: 0 }, brand: "DR" }, select: { contractValue: true } });
   const crmAvgJob = signed.length ? signed.reduce((s, l) => s + (l.contractValue ?? 0), 0) / signed.length : 0;
   const since30 = new Date(Date.now() - 30 * 86400000);
   const enquiries30 = await prisma.lead.count({ where: { createdAt: { gte: since30 } } });
@@ -143,13 +143,13 @@ export async function accountsView() {
 
   // ----- work on the books: signed work still to invoice, and quotes in progress -----
   const signedJobs = await prisma.lead.findMany({
-    where: { stage: "Signed", cancelled: false, contractValue: { gt: 0 }, brand: { in: ["ENP", "DR"] } },
+    where: { stage: "Signed", cancelled: false, contractValue: { gt: 0 }, brand: "DR" },
     select: { id: true, brand: true, stage: true, company: true, leadName: true, contractValue: true, grossProfit: true, signedDate: true, depositClearedDate: true, claim50PaidDate: true, jobNumber: true, xeroContact: true,
       quoteValue: true, estOtherCosts: true, estContingencyPct: true, tradeQuotes: { select: { trade: true, price: true, status: true } }, scopeItems: { select: { trade: true, byClient: true } } },
   });
   const yearAgoIso = addDays(today, -365);
   const recentSigned = signedJobs.filter((j) => !j.signedDate || j.signedDate >= yearAgoIso);
-  const quoting = await prisma.lead.findMany({ where: { stage: "Quoting", cancelled: false, brand: { in: ["ENP", "DR"] } }, select: { quoteValue: true } });
+  const quoting = await prisma.lead.findMany({ where: { stage: "Quoting", cancelled: false, brand: "DR" }, select: { quoteValue: true } });
 
   // ----- running costs: Xero's operating expenses (P&L), average of the last 3 complete months -----
   const g = settings.grossMarginGoal / 100, n = settings.netMarginGoal / 100;

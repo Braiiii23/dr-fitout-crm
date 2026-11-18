@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
   const rows = (
     await prisma.lead.findMany({
-      where: { brand: { in: ["ENP", "DR", "CONSULTING"] }, cancelled: false },
+      where: { brand: "DR", cancelled: false },
       include: { setter: { select: { name: true } } },
       orderBy: [{ signedDate: "desc" }, { updatedAt: "desc" }],
     })
