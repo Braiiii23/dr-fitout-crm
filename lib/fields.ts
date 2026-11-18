@@ -1,5 +1,5 @@
 // Field metadata drives the lead forms and grids — add/rename fields here (plus prisma/schema.prisma) to customise.
-import { LEAD_SOURCES, MARKETING_CHANNELS, STAGES, type BrandKey } from "./constants";
+import { LEAD_CATEGORIES, LEAD_SOURCES, MARKETING_CHANNELS, STAGES, type BrandKey } from "./constants";
 
 export type FieldType = "text" | "textarea" | "number" | "int" | "money" | "date" | "datetime" | "checkbox" | "select" | "url" | "email" | "phone" | "setter";
 export type FieldDef = { key: string; label: string; type: FieldType; options?: string[] | ((b: BrandKey) => string[]); brands?: BrandKey[]; financial?: boolean; help?: string };
@@ -12,6 +12,7 @@ export const LEAD_GROUPS: FieldGroup[] = [
     { key: "role", label: "Role", type: "text" }, { key: "phone", label: "Phone", type: "phone" }, { key: "email", label: "Email", type: "email" },
   ] },
   { title: "Pipeline", fields: [
+    { key: "category", label: "Category", type: "select", options: LEAD_CATEGORIES },
     { key: "stage", label: "Stage", type: "select", options: (b) => STAGES[b] },
     { key: "leadSource", label: "Lead Source", type: "select", options: LEAD_SOURCES },
     { key: "marketingChannel", label: "Marketing Channel", type: "select", options: MARKETING_CHANNELS },

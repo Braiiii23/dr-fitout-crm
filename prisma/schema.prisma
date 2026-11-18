@@ -51,6 +51,7 @@ model Lead {
   id                   String    @id @default(cuid())
   externalId           String?   @unique
   brand                String
+  category             String?   // Turnkey fitout | Joint venture | Normal fitout
   leadName             String?
   company              String?
   role                 String?
@@ -619,7 +620,7 @@ model Lease {
   suburb           String?
   centre           String?                   // shopping centre or building name
   sizeSqm          Float?
-  status           String   @default("Prospect") // Prospect | Negotiating | Heads of agreement | Signed | Current | Expired | Lost
+  status           String   @default("Enquiring") // Enquiring | Concept proposing | Sign
   landlord         String?
   landlordContact  String?
   leasingAgent     String?
@@ -636,10 +637,50 @@ model Lease {
   incentive        Float?                    // landlord fitout contribution $ ex GST
   rentFreeMonths   Float?
   permittedUse     String?
+  files            String?                   // JSON [{id, name, kind: "floor plan"|"lease"|"other", added}]
+  fits             ConceptFit[]
   makeGood         String?
   notes            String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   @@index([status])
   @@index([expiryDate])
+}
+
+/// A DR Fitout concept design we can reuse: the room schedule and design intent, plus images / PDFs.
+model Concept {
+  id           String   @id @default(cuid())
+  name         String
+  practiceType String?                   // GP clinic | Dental | Physio | ... (same list as clients)
+  status       String   @default("Ready") // Draft | Ready | Archived
+  minSqm       Float?
+  maxSqm       Float?
+  description  String?                   // design intent, look and feel, how the plan works
+  rooms        String?                   // JSON [{name, qty, areaSqm, notes}]
+  finishes     String?
+  tags         String?
+  files        String?                   // JSON [{id, name, kind: "image"|"plan"|"other", added}]
+  createdBy    String?
+  fits         ConceptFit[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@index([practiceType])
+}
+
+/// The AI's test fit of a concept onto a lease's tenancy floor plan.
+model ConceptFit {
+  id        String   @id @default(cuid())
+  leaseId   String
+  lease     Lease    @relation(fields: [leaseId], references: [id], onDelete: Cascade)
+  conceptId String
+  concept   Concept  @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  status    String   @default("done")  // done | error
+  result    String?                     // JSON from the AI: tenancy, rooms with positions, fit verdict, notes
+  brief     String?                     // extra instructions typed when it was run
+  chosen    Boolean  @default(false)    // the one we're proposing to the client
+  model     String?
+  error     String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  @@index([leaseId])
 }

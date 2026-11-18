@@ -3,7 +3,7 @@ import { requireViewer } from "@/lib/team-view";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
-import { BRANDS, STAGES, brandFromSlug } from "@/lib/constants";
+import { BRANDS, CATEGORY_COLOURS, LEAD_CATEGORIES, STAGES, brandFromSlug } from "@/lib/constants";
 import { fmtAUD } from "@/lib/money";
 import { fmtDate, fmtDateTime } from "@/lib/time";
 import { PageTitle, StageBadge } from "@/components/ui";
@@ -18,23 +18,33 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
   const view = sp.view === "pipeline" ? "pipeline" : "grid";
   const q = (sp.q ?? "").trim();
   const stage = sp.stage ?? "";
+  const category = LEAD_CATEGORIES.includes(sp.category) ? sp.category : sp.category === "none" ? "none" : "";
   const leads = await prisma.lead.findMany({
-    where: { brand, ...(stage ? { stage } : {}), ...(q ? { OR: [{ leadName: { contains: q } }, { company: { contains: q } }, { email: { contains: q } }, { phone: { contains: q } }, { location: { contains: q } }] } : {}) },
-    include: { setter: true }, orderBy: [{ dateReceived: "desc" }, { createdAt: "desc" }],
+    where: { brand, ...(stage ? { stage } : {}), ...(category === "none" ? { category: null } : category ? { category } : {}), ...(q ? { OR: [{ leadName: { contains: q } }, { company: { contains: q } }, { email: { contains: q } }, { phone: { contains: q } }, { location: { contains: q } }] } : {}) },
+    orderBy: [{ dateReceived: "desc" }, { createdAt: "desc" }],
   });
   const stages = STAGES[brand];
   const signedTotal = leads.filter((l) => l.stage === "Signed").reduce((s, l) => s + (l.contractValue ?? 0), 0);
   const tab = (v: string, label: string) => (
-    <Link prefetch={false} href={`?view=${v}${q ? `&q=${encodeURIComponent(q)}` : ""}${stage ? `&stage=${encodeURIComponent(stage)}` : ""}`} className={view === v ? "btn" : "btn-ghost"}>{label}</Link>
+    <Link prefetch={false} href={`?view=${v}${q ? `&q=${encodeURIComponent(q)}` : ""}${stage ? `&stage=${encodeURIComponent(stage)}` : ""}${category ? `&category=${encodeURIComponent(category)}` : ""}`} className={view === v ? "btn" : "btn-ghost"}>{label}</Link>
   );
+  const catCounts = await prisma.lead.groupBy({ by: ["category"], where: { brand }, _count: true });
+  const catN = (c: string | null) => catCounts.find((x) => x.category === c)?._count ?? 0;
+  const catHref = (c: string) => `?${new URLSearchParams({ view, ...(q ? { q } : {}), ...(stage ? { stage } : {}), ...(c ? { category: c } : {}) })}`;
   return (
     <div>
       <PageTitle title={B.table} sub={`${leads.length} leads · Signed work ${fmtAUD(signedTotal)}`}>
         {tab("grid", "Grid view")}{tab("pipeline", "Pipeline")}
         <Link prefetch={false} href={`/leads/${slug}/new`} className="btn">+ New lead</Link>
       </PageTitle>
+      <nav className="mb-3 flex flex-wrap gap-2" aria-label="Lead categories">
+        <Link prefetch={false} href={catHref("")} className={`lease-tab ${!category ? "is-on" : ""}`}>All categories <span>{catCounts.reduce((a, x) => a + x._count, 0)}</span></Link>
+        {LEAD_CATEGORIES.map((c) => <Link prefetch={false} key={c} href={catHref(c)} className={`lease-tab ${category === c ? "is-on" : ""}`}>{c} <span>{catN(c)}</span></Link>)}
+        {catN(null) > 0 && <Link prefetch={false} href={catHref("none")} className={`lease-tab ${category === "none" ? "is-on" : ""}`}>No category <span>{catN(null)}</span></Link>}
+      </nav>
       <form className="mb-4 flex flex-wrap gap-2">
         <input type="hidden" name="view" value={view} />
+        {category && <input type="hidden" name="category" value={category} />}
         <input name="q" defaultValue={q} placeholder="Search name, company, email, phone, address…" className="input max-w-sm" />
         <select name="stage" defaultValue={stage} className="input max-w-[12rem]"><option value="">All stages</option>{stages.map((s) => <option key={s}>{s}</option>)}</select>
         <button className="btn-ghost">Filter</button>
@@ -42,17 +52,17 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
       {view === "grid" ? (
         <div className="card overflow-x-auto p-0">
           <table className="table">
-            <thead><tr><th>Lead</th><th>Company</th><th>Stage</th><th>Source</th><th>Received</th><th>Next follow-up</th><th>Appointment</th><th>Location</th><th>Quote value</th><th>Contract value</th></tr></thead>
+            <thead><tr><th>Lead</th><th>Company</th><th>Category</th><th>Stage</th><th>Source</th><th>Received</th><th>Next follow-up</th><th>Appointment</th><th>Location</th><th>Quote value</th><th>Contract value</th></tr></thead>
             <tbody>
               {leads.map((l) => (
                 <tr key={l.id} className="hover:bg-slate-50">
                   <td><Link prefetch={false} className="font-medium brand-text hover:underline" href={`/leads/${slug}/${l.id}`}>{l.leadName || "(no name)"}</Link><div className="text-xs text-slate-500">{l.phone} {l.email}</div></td>
-                  <td>{l.company}</td><td><StageBadge stage={l.stage} /></td><td>{l.leadSource}</td>
+                  <td>{l.company}</td><td>{l.category ? <span className={`badge ${CATEGORY_COLOURS[l.category] ?? ""}`}>{l.category}</span> : <span className="admin-muted">—</span>}</td><td><StageBadge stage={l.stage} /></td><td>{l.leadSource}</td>
                   <td className="whitespace-nowrap">{fmtDate(l.dateReceived)}</td><td className="whitespace-nowrap">{fmtDate(l.nextFollowUp)}</td>
                   <td className="whitespace-nowrap">{fmtDateTime(l.appointment)}</td><td>{l.location}</td>
                   <td>{fmtAUD(l.quoteValue)}</td><td>{fmtAUD(l.contractValue)}</td>
                 </tr>))}
-              {!leads.length && <tr><td colSpan={10} className="py-8 text-center text-slate-500">No leads match.</td></tr>}
+              {!leads.length && <tr><td colSpan={11} className="py-8 text-center text-slate-500">No leads match.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -66,6 +76,7 @@ export default async function LeadsPage({ params, searchParams }: { params: Prom
                   <div key={l.id} className="pipe-card rounded-lg bg-white p-3 text-sm shadow-sm">
                     <Link prefetch={false} href={`/leads/${slug}/${l.id}`} className="font-medium brand-text hover:underline">{l.leadName || "(no name)"}</Link>
                     <div className="text-slate-600">{l.company}</div>
+                    {l.category && <span className={`badge mt-1 ${CATEGORY_COLOURS[l.category] ?? ""}`}>{l.category}</span>}
                     {l.nextFollowUp && <div className="text-xs text-slate-500">Follow up {fmtDate(l.nextFollowUp)}</div>}
                     {l.contractValue ? <div className="text-xs text-slate-500">{fmtAUD(l.contractValue)}</div> : null}
                     <form action={moveStage} className="mt-2"><input type="hidden" name="id" value={l.id} />

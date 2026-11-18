@@ -7,8 +7,8 @@ import { audit, runLeadAutomations, runCallAutomations, stageSideEffects } from 
 import { fillGpOnSign } from "./job-estimate";
 import { ensureJobForLead } from "./job-from-lead";
 
-// Grok's full access: read everything, create and change records like Braiden would.
-// Not allowed: deleting anything, logins/passwords (User), and the Xero / BuilderTrend connections and settings store.
+// Grok's full access: read everything, create and change records like the admin would.
+// Not allowed: deleting anything, changing the software, logins/passwords (User), and the Xero / BuilderTrend connections and settings store.
 // Auth: Authorization: Bearer <GROK_ADMIN_KEY>. Every change is recorded in the audit log as "grok".
 
 export const json = (d: unknown, status = 200) => NextResponse.json(d, { status, headers: { "Cache-Control": "no-store" } });
@@ -26,10 +26,12 @@ export function grokAuth(req: Request): NextResponse | null {
 
 /** URL name → table, and whether Grok may change it. Tables not listed here are off limits. */
 export const RESOURCES: Record<string, { model: string; write: boolean; about: string }> = {
-  leads: { model: "Lead", write: true, about: "ENP, DR Fitout and Consulting leads (brand: ENP | DR | CONSULTING)" },
-  calls: { model: "CallListItem", write: true, about: "Call list (setters' and team calls). Book slots with POST /api/grok/actions/book-slot" },
-  setters: { model: "Setter", write: true, about: "Setters" },
-  slots: { model: "FreeSlot", write: true, about: "Bookable free slots (status is managed by bookings)" },
+  leads: { model: "Lead", write: true, about: "DR Fitout leads (brand is always DR; category: Turnkey fitout | Joint venture | Normal fitout)" },
+  clients: { model: "Client", write: true, about: "Client practices. Link leads/jobs/leases with their clientId." },
+  leases: { model: "Lease", write: true, about: "Tenancies. status (stage): Enquiring | Concept proposing | Sign. Dates YYYY-MM-DD. files is managed by the app." },
+  concepts: { model: "Concept", write: true, about: "Concept designs. rooms is JSON [{name, qty, areaSqm, notes}]. files is managed by the app." },
+  "concept-fits": { model: "ConceptFit", write: false, about: "AI test fits of a concept onto a lease's floor plan (read only; run one with POST /api/grok/actions/concept-fit)" },
+  directory: { model: "CallListItem", write: true, about: "The Directory: designers, leasing agents, landlords, clients and trades (business is always DR)" },
   "trade-quotes": { model: "TradeQuote", write: true, about: "Estimating: trade quotes on a lead's trade pack" },
   "scope-items": { model: "ScopeItem", write: true, about: "Estimating: scope of works items" },
   jobs: { model: "Job", write: true, about: "Live and completed jobs (WIP)" },
@@ -39,7 +41,11 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
   labour: { model: "JobLabour", write: true, about: "Labour hours on a job" },
   materials: { model: "JobMaterial", write: true, about: "Materials receipts on a job" },
   tasks: { model: "JobTask", write: true, about: "A job's build program" },
-  reminders: { model: "ReminderRequest", write: true, about: "Reminder queue (Anita / Todoist)" },
+  "calendar-events": { model: "CalEvent", write: true, about: "Team calendar events" },
+  todos: { model: "Todo", write: true, about: "To-dos and tasks given out" },
+  kpis: { model: "Kpi", write: true, about: "KPIs set for people" },
+  "kpi-entries": { model: "KpiEntry", write: true, about: "KPI entries logged by hand" },
+  reminders: { model: "ReminderRequest", write: true, about: "Reminder queue" },
   "accounts-settings": { model: "AccountsSettings", write: true, about: "Accounts targets and settings (one row, id \"settings\")" },
   "claim-notices": { model: "ClaimNotice", write: false, about: "Notices sent to accounts about claims (read only)" },
   emails: { model: "EmailLog", write: false, about: "Emails the CRM sent or logged (read only)" },
@@ -47,7 +53,12 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
   snapshots: { model: "JobSnapshot", write: false, about: "Weekly WIP snapshots (read only)" },
 };
 // Fields that only the app itself manages.
-const LOCKED: Record<string, string[]> = { CallListItem: ["slotId"], FreeSlot: ["status"] };
+const LOCKED: Record<string, string[]> = {
+  CallListItem: ["slotId", "setterId", "business"], Lead: ["brand", "setterId"], Job: ["brand"],
+  Lease: ["files"], Concept: ["files"], ConceptFit: ["result"],
+};
+/** Values Grok can't choose: this is a DR Fitout-only CRM. */
+export const FIXED: Record<string, Record<string, unknown>> = { Lead: { brand: "DR" }, Job: { brand: "DR" }, CallListItem: { business: "DR" } };
 const ALWAYS_LOCKED = ["id", "createdAt", "updatedAt"];
 
 type Field = { name: string; kind: string; type: string; isRequired: boolean; isList: boolean; hasDefaultValue: boolean };
@@ -73,6 +84,8 @@ export function coerce(model: string, body: Record<string, unknown>, creating: b
     else if (f.type === "DateTime") { const d = new Date(String(v)); if (Number.isNaN(d.getTime())) errors.push(`${k} must be an ISO date-time`); else data[k] = d; }
     else data[k] = v; // enums
   }
+  if (model === "Lease" && typeof data.status === "string" && !["Enquiring", "Concept proposing", "Sign"].includes(data.status)) errors.push("status must be Enquiring | Concept proposing | Sign");
+  if (model === "Lead" && typeof data.category === "string" && !["Turnkey fitout", "Joint venture", "Normal fitout"].includes(data.category)) errors.push("category must be Turnkey fitout | Joint venture | Normal fitout");
   if (creating) for (const f of writableFields(model)) if (f.isRequired && !f.hasDefaultValue && !(f.name in data)) errors.push(`${f.name} is required`);
   return { data, errors };
 }
@@ -84,7 +97,7 @@ export function appendTo(existing: string | null | undefined, text: unknown) {
   const stamp = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Brisbane", day: "numeric", month: "short", year: "numeric" }).format(new Date());
   return [existing?.trimEnd(), `${stamp} (Grok): ${t}`].filter(Boolean).join("\n\n");
 }
-const NOTES_FIELD: Record<string, string> = { Lead: "notes", CallListItem: "callNotes", Job: "notes", JobClaim: "notes", JobCostLine: "notes", JobBill: "notes", JobLabour: "notes", Setter: "notes" };
+const NOTES_FIELD: Record<string, string> = { Lead: "notes", CallListItem: "callNotes", Job: "notes", JobClaim: "notes", JobCostLine: "notes", JobBill: "notes", JobLabour: "notes", Client: "notes", Lease: "notes" };
 export const notesField = (model: string) => NOTES_FIELD[model] ?? null;
 
 /** The same follow-on work the app does when someone saves these records in the browser. */

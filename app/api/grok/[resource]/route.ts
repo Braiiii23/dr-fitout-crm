@@ -1,4 +1,4 @@
-import { grokAuth, json, RESOURCES, coerce, delegate, afterWrite, grokAudit, scalarFields, notesField, appendTo } from "@/lib/grok-api";
+import { grokAuth, json, RESOURCES, coerce, delegate, afterWrite, grokAudit, scalarFields, notesField, appendTo, FIXED } from "@/lib/grok-api";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +36,8 @@ export async function POST(req: Request, ctx: Ctx) {
   const { data, errors } = coerce(r.model, body, true);
   const nf = notesField(r.model);
   if (nf && body.appendNotes) data[nf] = appendTo(data[nf] as string | null, body.appendNotes);
+  Object.assign(data, FIXED[r.model] ?? {});
+  if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
   if (errors.length) return json({ ok: false, errors }, 400);
   if (new URL(req.url).searchParams.get("dryRun") === "1") return json({ ok: true, dryRun: true, wouldCreate: data });
   try {

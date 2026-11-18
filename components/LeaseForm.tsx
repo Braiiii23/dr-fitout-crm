@@ -23,8 +23,9 @@ export default function LeaseForm({ lease, clients, leads, defaults, action, sub
           <F label="Suburb"><input name="suburb" className="input" defaultValue={v("suburb")} /></F>
           <F label="Centre / building"><input name="centre" className="input" defaultValue={v("centre")} /></F>
           <F label="Size (sqm)"><input name="sizeSqm" className="input" inputMode="decimal" defaultValue={v("sizeSqm")} /></F>
-          <F label="Status"><select name="status" className="input" defaultValue={(lease?.status ?? "Prospect")}>{LEASE_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></F>
+          <F label="Stage"><select name="status" className="input" defaultValue={lease?.status ?? "Enquiring"}>{LEASE_STATUSES.map((s) => <option key={s}>{s}</option>)}</select></F>
           <F label="Client"><select name="clientId" className="input" defaultValue={lease?.clientId ?? defaults?.clientId ?? ""}><option value="">— none —</option>{clients.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></F>
+          <F label="…or add a new client"><input name="newClientName" className="input" placeholder="Practice name (creates and links it)" /></F>
           <F label="From lead"><select name="leadId" className="input" defaultValue={lease?.leadId ?? defaults?.leadId ?? ""}><option value="">— none —</option>{leads.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</select></F>
           <F label="Permitted use"><input name="permittedUse" className="input" defaultValue={v("permittedUse")} placeholder="e.g. Medical centre" /></F>
         </div>

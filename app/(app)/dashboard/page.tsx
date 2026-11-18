@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { getBrand } from "@/lib/brand";
 import { BRANDS, STAGES, type BrandKey } from "@/lib/constants";
-import { OPEN_LEASE, inDays, keyDates, urgency } from "@/lib/leases";
+import { OPEN_LEASE, PRE_SIGN, inDays, keyDates, urgency } from "@/lib/leases";
 import { fmtAUD } from "@/lib/money";
 import { brisbaneToday, fmtDate, fmtDateTime } from "@/lib/time";
 import { StageBadge } from "@/components/ui";
@@ -36,7 +36,7 @@ export default async function Dashboard() {
   const followUps = leads.filter((l) => l.nextFollowUp && l.nextFollowUp <= today && !["Signed", "Lost"].includes(l.stage ?? "")).slice(0, 10);
   const leaseDates = leases.flatMap((l) => keyDates(l, today).map((d) => ({ ...d, l }))).filter((d) => d.days >= -14 && d.days <= 180).sort((a, b) => a.date.localeCompare(b.date));
   const leaseSoon = leaseDates.filter((d) => d.days >= 0 && d.days <= 90).length;
-  const negotiating = leases.filter((l) => ["Prospect", "Negotiating", "Heads of agreement"].includes(l.status)).length;
+  const negotiating = leases.filter((l) => PRE_SIGN.includes(l.status)).length;
   const pct = Math.min(100, (signedThisMonth / MONTHLY_TARGET) * 100);
   const [y, m] = monthKey.split("-").map(Number);
   const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
@@ -118,7 +118,7 @@ export default async function Dashboard() {
         <div className="dash-kpi">
           <div className="kpi-label">Lease key dates · next 90 days</div>
           <div className="kpi-value">{leaseSoon}</div>
-          <Link prefetch={false} href="/leases" className="text-xs brand-text underline">{negotiating} lease{negotiating === 1 ? "" : "s"} in negotiation</Link>
+          <Link prefetch={false} href="/leases" className="text-xs brand-text underline">{negotiating} lease{negotiating === 1 ? "" : "s"} before signing</Link>
         </div>
         <div className="dash-kpi">
           <div className="kpi-label">Active clients</div>

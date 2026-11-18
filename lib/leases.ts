@@ -4,14 +4,27 @@ import { brisbaneToday, daysDiff } from "./time";
 
 export const CLIENT_TYPES = ["GP clinic", "Dental", "Physio", "Specialist", "Allied health", "Pharmacy", "Imaging", "Day surgery", "Vet", "Other"];
 export const CLIENT_STATUSES = ["Prospect", "Active", "Past"];
-export const LEASE_STATUSES = ["Prospect", "Negotiating", "Heads of agreement", "Signed", "Current", "Expired", "Lost"];
+/** Lease stages, in order: finding the tenancy, proposing the concept fitout, then signed. */
+export const LEASE_STATUSES = ["Enquiring", "Concept proposing", "Sign"];
+export const LEASE_STAGE_HELP: Record<string, string> = {
+  Enquiring: "Looking at the tenancy: enquiries with the agent or landlord.",
+  "Concept proposing": "Concept fitout and proposal with the client; terms being worked out.",
+  Sign: "Lease signed (or signing). Key dates are tracked from here.",
+};
+/** Stages before signing (shown as "in progress"). */
+export const PRE_SIGN = ["Enquiring", "Concept proposing"];
+/** Older stage names from the first version, mapped onto the new stages. */
+export const OLD_STAGE: Record<string, string> = {
+  Prospect: "Enquiring", Negotiating: "Concept proposing", "Heads of agreement": "Concept proposing",
+  Signed: "Sign", Current: "Sign", Expired: "Sign", Lost: "Enquiring",
+};
+export const stageOf = (s: string) => (LEASE_STATUSES.includes(s) ? s : OLD_STAGE[s] ?? "Enquiring");
 export const REVIEW_TYPES = ["Fixed 3%", "Fixed 4%", "CPI", "Market", "Other"];
 /** Leases still worth watching (key dates shown on the dashboard). */
-export const OPEN_LEASE = ["Prospect", "Negotiating", "Heads of agreement", "Signed", "Current"];
+export const OPEN_LEASE = [...LEASE_STATUSES];
 
 export const LEASE_STATUS_COLOURS: Record<string, string> = {
-  Prospect: "lease-s-prospect", Negotiating: "lease-s-neg", "Heads of agreement": "lease-s-hoa",
-  Signed: "lease-s-signed", Current: "lease-s-current", Expired: "lease-s-expired", Lost: "lease-s-lost",
+  Enquiring: "lease-s-enq", "Concept proposing": "lease-s-concept", Sign: "lease-s-sign",
 };
 
 const txt = (fd: FormData, k: string) => { const v = String(fd.get(k) ?? "").trim(); return v === "" ? null : v; };
@@ -33,7 +46,7 @@ export function parseLeaseForm(fd: FormData) {
   return {
     clientId: txt(fd, "clientId"), leadId: txt(fd, "leadId"),
     premises: txt(fd, "premises") ?? "Address to come", tenancy: txt(fd, "tenancy"), suburb: txt(fd, "suburb"), centre: txt(fd, "centre"),
-    sizeSqm: num(fd, "sizeSqm"), status: pick(txt(fd, "status"), LEASE_STATUSES, "Prospect"),
+    sizeSqm: num(fd, "sizeSqm"), status: pick(txt(fd, "status"), LEASE_STATUSES, "Enquiring"),
     landlord: txt(fd, "landlord"), landlordContact: txt(fd, "landlordContact"), leasingAgent: txt(fd, "leasingAgent"), agentContact: txt(fd, "agentContact"),
     commencementDate: date(fd, "commencementDate"), expiryDate: date(fd, "expiryDate"), termYears: num(fd, "termYears"), options: txt(fd, "options"),
     optionNoticeDate: date(fd, "optionNoticeDate"), rentPa: num(fd, "rentPa"), outgoingsPa: num(fd, "outgoingsPa"),
@@ -60,7 +73,7 @@ export function keyDates(l: Lease, today = brisbaneToday()): KeyDate[] {
   add("Option notice due", l.optionNoticeDate, "option");
   add("Rent review", l.nextReviewDate, "review");
   add("Lease expires", expiryOf(l), "expiry");
-  if (l.status !== "Current") add("Commences", l.commencementDate, "start");
+  add("Commences", l.commencementDate, "start");
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 

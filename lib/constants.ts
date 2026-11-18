@@ -12,6 +12,9 @@ export const STAGES: Record<BrandKey, string[]> = {
   DR: ["New", "Contacted", "Potential Leases", "Quoting", "Signed", "Lost", "Stay in Touch"],
   CONSULTING: ["New", "Contacted", "Signed", "Lost", "Stay in Touch"],
 };
+/** DR Fitout lead categories. */
+export const LEAD_CATEGORIES = ["Turnkey fitout", "Joint venture", "Normal fitout"];
+export const CATEGORY_COLOURS: Record<string, string> = { "Turnkey fitout": "cat-turnkey", "Joint venture": "cat-jv", "Normal fitout": "cat-normal" };
 export const LEAD_SOURCES = ["Kehoe Studio", "Researched", "Referral", "Direct enquiry", "Lead bot", "Other"];
 export const MARKETING_CHANNELS = ["Website", "Instagram", "Organic", "Google", "Email"];
 export const CALL_STATUSES = ["To Call", "No Answer", "Call Back", "Not Interested", "Appointment Set", "Wrong Number", "Braiden to Connect", "Quoting", "Contacted"];

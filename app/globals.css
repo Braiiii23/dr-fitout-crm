@@ -1591,3 +1591,49 @@ main { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !importan
   .lease-dates li { flex-wrap: wrap; gap: .25rem .6rem; }
   .lease-when { flex-direction: row; gap: .5rem; align-items: baseline; min-width: 0; }
 }
+
+/* Lease stages + board */
+.lease-s-enq { background:rgba(148,163,184,.2); color:#e2e8f0; }
+.lease-s-concept { background:rgba(164,107,224,.28); color:#efe4fb; }
+.lease-s-sign { background:rgba(34,197,94,.22); color:#86efac; }
+.lease-board { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:1rem; align-items:start; }
+@media (max-width: 900px) { .lease-board { grid-template-columns:1fr; } }
+.lease-col { border-radius:1rem; padding:.85rem; background:color-mix(in srgb, var(--card-bg) 70%, transparent); border:1px solid var(--card-border); border-top:3px solid var(--brand); display:flex; flex-direction:column; gap:.6rem; }
+.lease-col > header { display:flex; justify-content:space-between; align-items:center; }
+.lease-col-help { font-size:.75rem; color:var(--muted); margin-top:-.2rem; }
+.lease-card { border-radius:.75rem; padding:.7rem .8rem; background:var(--card-elevated); border:1px solid var(--card-border); display:flex; flex-direction:column; gap:.25rem; }
+.lease-card-edit { display:grid; grid-template-columns:1fr auto; gap:.4rem; margin-top:.35rem; align-items:center; }
+.lease-client-select { padding:.2rem .45rem; font-size:.8rem; min-width:10rem; }
+
+/* Lead categories */
+.cat-turnkey { background:rgba(164,107,224,.3); color:#f3eef8; }
+.cat-jv { background:rgba(56,189,248,.2); color:#bae6fd; }
+.cat-normal { background:rgba(148,163,184,.2); color:#e2e8f0; }
+
+/* Concepts library + AI concept fit */
+.concept-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:1rem; }
+.concept-card { display:block; border-radius:1rem; overflow:hidden; background:var(--card-bg); border:1px solid var(--card-border); box-shadow:var(--shadow-card); transition:transform .15s, border-color .15s; }
+.concept-card:hover { transform:translateY(-2px); border-color:var(--brand-strong); }
+.concept-thumb { aspect-ratio:16/10; background:linear-gradient(135deg, var(--hero-from), var(--hero-to)); display:grid; place-items:center; color:#e9ddf7; font-weight:700; letter-spacing:.06em; text-transform:uppercase; font-size:.8rem; }
+.concept-thumb img { width:100%; height:100%; object-fit:cover; }
+.concept-gallery { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:.75rem; }
+.concept-gallery figure { border-radius:.75rem; overflow:hidden; border:1px solid var(--card-border); background:var(--card-bg); }
+.concept-gallery img { width:100%; aspect-ratio:4/3; object-fit:cover; display:block; }
+.concept-gallery figcaption { display:flex; justify-content:space-between; padding:.35rem .6rem; font-size:.75rem; color:var(--muted); }
+.concept-doc { display:grid; place-items:center; aspect-ratio:4/3; text-align:center; font-size:.8rem; padding:.5rem; color:var(--ink); }
+.concept-run { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1.5fr) auto; gap:.75rem; }
+@media (max-width: 900px) { .concept-run { grid-template-columns:1fr; } }
+.concept-panel-on { border-color:var(--brand-strong); box-shadow:0 0 0 1px var(--brand-strong), var(--shadow-card); }
+.concept-result { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:1.25rem; align-items:start; }
+@media (max-width: 1000px) { .concept-result { grid-template-columns:1fr; } }
+.fit-plan { margin:0; border-radius:.9rem; background:#f7f4fb; padding:.6rem; }
+.fit-plan svg { width:100%; height:auto; display:block; max-height:640px; }
+.fit-grid line { stroke:#e4dcef; stroke-width:1; }
+.fit-outline { fill:#fff; stroke:#2e1546; stroke-width:4; fill-opacity:.6; }
+.fit-room { fill-opacity:.85; stroke:#fff; stroke-width:2; }
+.fit-label { fill:#fff; font-weight:600; font-family:inherit; }
+.fit-dim { fill:#4b3a63; font-weight:500; }
+.fit-label .fit-dim { fill:rgba(255,255,255,.85); }
+.fit-legend { display:flex; flex-wrap:wrap; gap:.75rem; padding:.45rem .3rem 0; font-size:.72rem; color:#4b3a63; text-transform:capitalize; }
+.fit-legend i { display:inline-block; width:.7rem; height:.7rem; border-radius:.2rem; margin-right:.3rem; vertical-align:-1px; }
+.fit-bad { background:rgba(239,68,68,.2); color:#fca5a5; }

@@ -24,6 +24,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ ok: false, error: "Send a JSON object of fields" }, 400);
   const { data, errors } = coerce(r.model, body, false);
+  if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
   const nf = notesField(r.model);
   if (body.appendNotes) { if (!nf) errors.push(`${resource} has no notes field`); else data[nf] = appendTo((data[nf] as string | undefined) ?? before[nf], body.appendNotes); }
   if (errors.length) return json({ ok: false, errors }, 400);
@@ -39,4 +40,4 @@ export async function PATCH(req: Request, ctx: Ctx) {
 }
 
 /** No deleting through Grok. */
-export async function DELETE() { return json({ ok: false, error: "Grok can't delete records. Ask Braiden." }, 403); }
+export async function DELETE() { return json({ ok: false, error: "Grok can't delete records. Ask the admin." }, 403); }

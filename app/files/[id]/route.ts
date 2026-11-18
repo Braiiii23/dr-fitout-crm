@@ -1,10 +1,10 @@
 import { getUser } from "@/lib/auth";
 import { loadFile } from "@/lib/files";
 
-// Files attached to leads. Signed-in staff only (not setters or the team login).
+// Files attached to leads, leases and concepts. Signed-in staff only (not the shared team login).
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const u = await getUser();
-  if (!u || !["ADMIN", "ESTIMATOR", "ACCOUNTS"].includes(u.role)) return new Response("Not allowed", { status: 403 });
+  if (!u || !["ADMIN", "BDM", "PM", "ESTIMATOR", "ACCOUNTS", "FOREMAN"].includes(u.role)) return new Response("Not allowed", { status: 403 });
   const { id } = await ctx.params;
   const f = await loadFile(id);
   if (!f) return new Response("Not found", { status: 404 });

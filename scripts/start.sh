@@ -2,7 +2,7 @@
 # Production start for hosting (Railway / any Docker host).
 # The database lives on a persistent volume at $DATA_DIR (default /data) so it survives redeploys.
 set -e
-DATA_DIR="${DATA_DIR:-/data}"
+export DATA_DIR="${DATA_DIR:-/data}"   # exported so uploaded files (lib/files.ts) are kept on the volume too
 mkdir -p "$DATA_DIR"
 export DATABASE_URL="file:$DATA_DIR/crm.db"
 
@@ -35,5 +35,6 @@ if [ "$WIP_SEED_EXAMPLE" = "1" ] && [ ! -f "$DATA_DIR/.wip-seeded" ]; then
 fi
 
 node_modules/.bin/tsx scripts/ensure-users.ts
+node_modules/.bin/tsx scripts/migrate-lease-stages.ts
 
 exec node_modules/.bin/next start -H 0.0.0.0 -p "${PORT:-3100}"

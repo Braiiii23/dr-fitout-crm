@@ -25,7 +25,7 @@ export const ROLE_ABOUT: Record<AnyRole, string> = {
 export const TABS: [string, string][] = [
   ["/myday", "My Day"], ["/calendar", "Calendar"], ["/dashboard", "Dashboard"], ["/leads/dr", "Leads"],
   ["/jobs", "Jobs"], ["/wip", "WIP"], ["/estimating", "Estimating"], ["/accounts", "Accounts"],
-  ["/leases", "Leases"], ["/clients", "Clients"], ["/directory", "Directory"], ["/kpis", "KPI's"], ["/users", "Users"],
+  ["/leases", "Leases"], ["/concepts", "Concepts"], ["/clients", "Clients"], ["/directory", "Directory"], ["/kpis", "KPI's"], ["/users", "Users"],
 ];
 
 /** Area → roles that can open AND change it (longest matching prefix wins). CEO is treated as Admin everywhere. */
@@ -43,13 +43,14 @@ const AREAS: [string, AnyRole[]][] = [
   ["/wip", ["ADMIN", "CEO", "ACCOUNTS", "PM"]],
   ["/leases", ["ADMIN", "CEO", "BDM", "PM", "ACCOUNTS"]],
   ["/clients", ["ADMIN", "CEO", "BDM", "PM", "ACCOUNTS"]],
+  ["/concepts", ["ADMIN", "CEO", "BDM", "PM", "ESTIMATOR"]],
   ["/directory", ["ADMIN", "CEO", "TEAM", "BDM", "PM", "FOREMAN", "ACCOUNTS"]],
   ["/myday", [...ROLES]],
   ["/calendar", [...ROLES]],
 ];
 /** Roles who can also LOOK at the other parts of the CRM (view only: save buttons hidden, saves refused on the server). */
 export const STAFF_VIEWERS: AnyRole[] = ["ESTIMATOR", "PM", "FOREMAN", "ACCOUNTS", "BDM", "TEAM"];
-const VIEW_AREAS = ["/dashboard", "/leads", "/jobs", "/wip", "/estimating", "/accounts", "/leases", "/clients", "/directory"];
+const VIEW_AREAS = ["/dashboard", "/leads", "/jobs", "/wip", "/estimating", "/accounts", "/leases", "/concepts", "/clients", "/directory"];
 const NEVER_VIEW = ["/users", "/kpis", "/xero", "/accounts/settings", "/jobs/buildertrend"];
 /** Money pages BDM never sees, even view-only. */
 const BDM_HIDDEN = ["/accounts", "/wip"];
@@ -62,7 +63,8 @@ function baseCanOpen(role: AnyRole, path: string): boolean | null {
 }
 const staffMayView = (role: AnyRole, path: string) =>
   STAFF_VIEWERS.includes(role) && VIEW_AREAS.some((p) => under(path, p)) && !NEVER_VIEW.some((p) => under(path, p)) && !/\/new$/.test(path)
-  && !(role === "BDM" && BDM_HIDDEN.some((p) => under(path, p)));
+  && !(role === "BDM" && BDM_HIDDEN.some((p) => under(path, p)))
+  && !(role === "TEAM" && under(path, "/concepts")); // concept files are staff-only
 export function canOpen(role: AnyRole, path: string): boolean | null {
   const base = baseCanOpen(role, path);
   if (base === false && staffMayView(role, path)) return true;

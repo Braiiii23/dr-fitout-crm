@@ -7,8 +7,9 @@ import { fmtDate, brisbaneToday } from "@/lib/time";
 import { Flash, PageTitle, StageBadge } from "@/components/ui";
 import ConfirmButton from "@/components/ConfirmButton";
 import ClientForm from "@/components/ClientForm";
-import { LEASE_STATUS_COLOURS, expiryOf, inDays, keyDates, urgency } from "@/lib/leases";
+import { LEASE_STATUS_COLOURS, expiryOf, inDays, keyDates, stageOf, urgency } from "@/lib/leases";
 import { deleteClient, linkToClient, updateClient } from "../actions";
+import { setLeaseClient } from "../../leases/actions";
 
 const EDITORS = ["ADMIN", "BDM", "PM", "ACCOUNTS"];
 
@@ -25,10 +26,11 @@ export default async function ClientPage({ params, searchParams }: { params: Pro
     },
   });
   if (!c) notFound();
-  const [freeLeads, freeJobs] = canEdit ? await Promise.all([
+  const [freeLeads, freeJobs, freeLeases] = canEdit ? await Promise.all([
     prisma.lead.findMany({ where: { brand: "DR", clientId: null }, orderBy: { createdAt: "desc" }, select: { id: true, leadName: true, company: true } }),
     prisma.job.findMany({ where: { brand: "DR", clientId: null }, orderBy: { createdAt: "desc" }, select: { id: true, name: true, jobNumber: true } }),
-  ]) : [[], []];
+    prisma.lease.findMany({ where: { clientId: null }, orderBy: { updatedAt: "desc" }, select: { id: true, premises: true, tenancy: true, suburb: true } }),
+  ]) : [[], [], []];
   const today = brisbaneToday();
   const signed = c.jobs.reduce((a, j) => a + (j.contractValue ?? 0), 0);
   const quoting = c.leads.filter((l) => l.stage === "Quoting").reduce((a, l) => a + (l.quoteValue ?? 0), 0);
@@ -58,8 +60,10 @@ export default async function ClientPage({ params, searchParams }: { params: Pro
             <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <div><Link prefetch={false} href={`/leases/${l.id}`} className="font-semibold brand-text underline">{[l.tenancy, l.premises].filter(Boolean).join(", ")}</Link>
                 <div className="text-xs admin-muted">{[l.suburb, l.sizeSqm ? `${l.sizeSqm} m²` : "", l.rentPa ? `${fmtAUD(l.rentPa)}/yr` : "", expiryOf(l) ? `expires ${fmtDate(expiryOf(l))}` : ""].filter(Boolean).join(" · ")}</div></div>
-              <div className="flex items-center gap-2">{next && <span className={`lease-chip ${urgency(next.days)}`}>{next.label} · {inDays(next.days)}</span>}<span className={`badge ${LEASE_STATUS_COLOURS[l.status] ?? ""}`}>{l.status}</span></div>
+              <div className="flex items-center gap-2">{next && <span className={`lease-chip ${urgency(next.days)}`}>{next.label} · {inDays(next.days)}</span>}<span className={`badge ${LEASE_STATUS_COLOURS[stageOf(l.status)] ?? ""}`}>{stageOf(l.status)}</span>{canEdit && <form action={setLeaseClient} className="inline"><input type="hidden" name="id" value={l.id} /><input type="hidden" name="clientId" value="" /><input type="hidden" name="_back" value={`/clients/${c.id}`} /><button className="text-xs admin-muted underline" title="Unlink this lease from the client">unlink</button></form>}</div>
             </li>); })}</ul> : <p className="text-sm admin-muted">No leases yet.</p>}
+          {canEdit && freeLeases.length > 0 && <form action={setLeaseClient} className="mt-3 flex gap-2"><input type="hidden" name="clientId" value={c.id} /><input type="hidden" name="_back" value={`/clients/${c.id}`} />
+            <select name="id" className="input" defaultValue="" required><option value="">Link an existing lease…</option>{freeLeases.map((l) => <option key={l.id} value={l.id}>{[l.tenancy, l.premises, l.suburb].filter(Boolean).join(", ")}</option>)}</select><button className="btn-ghost">Link</button></form>}
         </section>
 
         <section className="dash-panel">
