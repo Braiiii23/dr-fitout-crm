@@ -1,0 +1,579 @@
+// ENP Fitouts / DR Fitout leads CRM — SQLite (free, local).
+// Mirrors Airtable base appcbbnP68yOLodPq. Airtable record ids are kept in `externalId`.
+// Dates without time (Airtable "date" fields) are stored as ISO strings "YYYY-MM-DD".
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// Login account. role: ADMIN | TEAM | SETTER
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         String   @default("TEAM")
+  passwordHash String
+  active       Boolean  @default(true)
+  setterId     String?  @unique
+  setter       Setter?  @relation(fields: [setterId], references: [id])
+  createdAt    DateTime @default(now())
+  // My Day: calendar
+  calFeedToken   String?   // private token for this person's calendar feed (Google / Outlook subscribe to it)
+  googleIcal     String?   // their Google Calendar "secret address in iCal format" (encrypted)
+  calColour      String?
+  googleSyncedAt DateTime?
+  googleSyncNote String?
+}
+
+model Setter {
+  id         String     @id @default(cuid())
+  externalId String?    @unique
+  name       String
+  email      String?
+  phone      String?
+  status     String     @default("Active") // Active | Inactive
+  startDate  String?
+  notes      String?
+  abn        String?
+  user       User?
+  calls      CallListItem[]
+  leads      Lead[]
+  createdAt  DateTime   @default(now())
+}
+
+/// One table for ENP Leads, DR Fitout Leads and Consulting Leads. brand: ENP | DR | CONSULTING
+model Lead {
+  id                   String    @id @default(cuid())
+  externalId           String?   @unique
+  brand                String
+  leadName             String?
+  company              String?
+  role                 String?
+  phone                String?
+  email                String?
+  stage                String?
+  leadSource           String?
+  dateReceived         String?
+  location             String?
+  projectType          String?
+  sizeSqm              Float?
+  budget               String?
+  timeframe            String?
+  tenancyStatus        String?
+  lookingFor           String?
+  sourceLink           String?
+  lastContacted        String?
+  nextFollowUp         String?
+  notes                String?
+  attachments          String?   // JSON array [{url, filename}]
+  appointmentSetter    String?   // legacy free-text setter name
+  quotedSetter150      Boolean   @default(false)
+  grossProfit          Float?
+  setterFeePaid        Boolean   @default(false)
+  appointment          DateTime?
+  marketingChannel     String?
+  quotedDate           String?
+  signedDate           String?
+  contractValue        Float?
+  setterId             String?
+  setter               Setter?   @relation(fields: [setterId], references: [id])
+  quoteIssued          Boolean   @default(false)
+  quoteValue           Float?
+  quoteIssuedDate      String?
+  newClient            Boolean   @default(false)
+  depositClearedDate   String?
+  claim50PaidDate      String?
+  cancelled            Boolean   @default(false)
+  cancelledDate        String?
+  appointmentHeld      Boolean   @default(false)
+  jobNumber            String?
+  braidenWillQuote     Boolean   @default(false)
+  setterWinNo          Int?
+  holdbackReleasedDate String?
+  potentialLeases      String?   // DR only
+  // Estimating checklist (Justin). Each holds the Brisbane date the step was ticked, or null.
+  estPlansAt           String?
+  estScopeAt           String?
+  estExcelAt           String?
+  estRfqAt             String?
+  estPrelimAt          String?   // prelim quote done / sent to the client
+  estRfqRecAt          String?   // RFQs received back from trades
+  estProposalAt        String?
+  estSentAt            String?
+  estimatorNotes       String?
+  estPriority          String?   // High | Normal | Low (estimating board order)
+  estPlansRequestedAt  String?   // when we asked for plans (waiting-on-plans counter), YYYY-MM-DD
+  estPrelimDue         String?   // prelim quote due to the client, YYYY-MM-DD
+  estFinalDue          String?   // final quote due to the client, YYYY-MM-DD
+  estOtherCosts        Float?    // estimator: materials, own labour, site costs, prelims (ex GST), on top of trade quotes
+  estContingencyPct    Float?    // estimator: contingency % on trade + other costs
+  xeroContact          String?   // the client's contact name in Xero, when it isn't matched automatically
+  referredByCallId     String?
+  referredByCall       CallListItem? @relation("ReferredBy", fields: [referredByCallId], references: [id])
+  calls                CallListItem[] @relation("CallLead")
+  tradeQuotes          TradeQuote[]
+  scopeItems           ScopeItem[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([brand, stage])
+  @@index([company])
+}
+
+model CallListItem {
+  id                String    @id @default(cuid())
+  externalId        String?   @unique
+  leadName          String?
+  company           String?
+  phone             String?
+  email             String?
+  business          String    @default("ENP") // ENP | DR
+  contactType       String    @default("CLIENT") // DESIGNER | LEASING_AGENT | LANDLORD | CLIENT | TRADE
+  trade             String?   // for trades: which trade (same list as the estimating trade packs)
+  leadInfo          String?
+  assignedSetter    String?   // legacy free text from Airtable
+  setterId          String?
+  setter            Setter?   @relation(fields: [setterId], references: [id])
+  claimedAt         DateTime?
+  priority          String    @default("Normal") // High | Normal | Low (set by Braiden; call lists are sorted by it)
+  callStatus        String    @default("To Call")
+  attempts          Int       @default(0)
+  appointment       DateTime?
+  lastCalled        String?
+  callNotes         String?
+  addedToCrm        Boolean   @default(false)
+  leadId            String?
+  lead              Lead?     @relation("CallLead", fields: [leadId], references: [id])
+  inviteSentAt      DateTime? // calendar invite sent for the booked appointment (set by the lead bot or by hand)
+  slotId            String?
+  slot              FreeSlot? @relation(fields: [slotId], references: [id])
+  registeredAt      DateTime?
+  possibleDuplicate Boolean   @default(false)
+  duplicateNote     String?
+  referredLeads     Lead[]    @relation("ReferredBy")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model FreeSlot {
+  id         String   @id @default(cuid())
+  externalId String?  @unique
+  label      String
+  start      DateTime
+  end        DateTime
+  status     String   @default("Free") // Free | Booked
+  bookings   CallListItem[]
+  createdAt  DateTime @default(now())
+
+  @@index([start])
+}
+
+/// Outbox for the monthly setter statement (send is stubbed — logged here, not emailed).
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  body      String
+  status    String   @default("stubbed")
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userEmail String?
+  action    String
+  entity    String
+  entityId  String?
+  detail    String?
+  createdAt DateTime @default(now())
+}
+
+/// Queued chase-up / quote reminders for Braiden → Anita Reminder / Todoist.
+/// Anita Reminder bot id: ca598b14-f4e4-4ff5-a2e4-81606f7c2dca — parent wires MCP Todoist create from pending rows.
+model ReminderRequest {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  dueString     String?  // natural language or YYYY-MM-DD for Anita/Todoist
+  leadId        String?
+  callId        String?
+  company       String?
+  brand         String?
+  status        String   @default("pending") // pending | todoist | done | cancelled
+  todoistTaskId String?
+  source        String   @default("dashboard") // dashboard | assistant | quoting
+  createdBy     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([callId])
+}
+
+/// A trade's quote (RFQ response) against a job being estimated.
+model TradeQuote {
+  id           String   @id @default(cuid())
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  trade        String              // e.g. Electrical, Plumbing
+  company      String?
+  scope        String?
+  price        Float?              // ex GST
+  status       String   @default("Requested") // Requested | Received | Accepted | Declined
+  receivedDate String?
+  link         String?             // link to the trade's quote document
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([leadId])
+}
+
+/// One line of a job's master scope of works. Coverage comes from the trade quotes for its trade.
+model ScopeItem {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  trade       String
+  description String
+  byClient    Boolean  @default(false) // supplied / done by the client or others, so no trade quote needed
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leadId])
+}
+
+/// The one Xero organisation this app reads from. Tokens are stored encrypted.
+model XeroConnection {
+  id            String   @id @default("xero")
+  tenantId      String
+  tenantName    String
+  accessToken   String   // encrypted
+  refreshToken  String   // encrypted
+  expiresAt     DateTime
+  scopes        String?
+  connectedBy   String?
+  connectedAt   DateTime @default(now())
+  lastSyncAt    DateTime?
+  lastSyncError String?
+}
+
+/// Latest copy of each thing read from Xero (bank summary, open invoices, P&L...), as JSON.
+model XeroSnapshot {
+  key       String   @id
+  json      String
+  ok        Boolean  @default(true)
+  note      String?
+  fetchedAt DateTime @default(now())
+}
+
+/// Targets and settings for the Accounts page (single row).
+model AccountsSettings {
+  id                  String  @id @default("settings")
+  monthlyTarget       Float   @default(1000000)
+  grossMarginGoal     Float   @default(25)
+  netMarginGoal       Float   @default(9)
+  bufferAmount        Float   @default(45000)
+  runningCostsMonthly Float   @default(181500)
+  avgJobSize          Float   @default(0)    // 0 = work it out from signed jobs in the CRM
+  quoteWinRate        Float   @default(30)
+  companyTaxRate      Float   @default(25)
+  cashAccounts        String  @default("7637,7645") // bank accounts counted as cash (name or number fragments)
+  holdingAccounts     String  @default("")          // of those, the ones holding tax money (not free to spend)
+  creditAccounts      String  @default("Amex,American Express,Credit Card")      // credit cards: shown as owed, not cash
+  addRunningCostsToForecast Boolean @default(true)
+  forecastRecurringIncome   Boolean @default(true)
+  useXeroFigures            Boolean @default(true)
+  staleDays                 Int     @default(60)
+  claimTermsDays            Int     @default(10)    // payment terms on claim invoices (days after issue)
+  claimNoticeDays           Int     @default(3)     // tell accounts this many days before a claim is due to be issued
+  claimNotifyEmail          String  @default("accounts@enpfitouts.com.au")
+  accountsTarget            Float   @default(0)     // 0 = work out a realistic monthly turnover target from Xero; the $1M stays the sales goal
+  depositPct                Float   @default(10)    // deposit share invoiced at signing, for work still to invoice
+  jobWeeks                  Int     @default(8)     // typical weeks from signing to final claim
+  otherWorkOnHand           Float   @default(0)     // signed work not in the CRM, still to invoice (ex GST)
+  workAlertMonths           Float   @default(2)     // warn when secured work covers fewer months of running costs than this
+  forecastSecuredOnly       Boolean @default(true)  // forecast only work already won (no assumed new sales)    // unpaid bills/invoices overdue longer than this are treated as "check in Xero", not cash flow  // once Xero has 3+ months of history, use its running costs instead of the figure above  // beyond 30 days, assume turnover continues at last month's level
+  updatedBy           String?
+  updatedAt           DateTime @updatedAt
+}
+
+// ===================== Jobs & WIP (live jobs) =====================
+/// A live job. Created when a lead is signed (or by hand / CSV). Everything in WIP hangs off this.
+model Job {
+  id            String   @id @default(cuid())
+  leadId        String?  @unique
+  brand         String                    // ENP | DR
+  name          String
+  jobNumber     String?
+  xeroTracking  String?                   // e.g. HECH002 (Xero tracking / project code)
+  client        String?
+  contractValue Float    @default(0)      // ex GST, signed
+  status        String   @default("Live") // Live | On hold | Complete
+  startDate     String?                   // YYYY-MM-DD
+  finishDate    String?                   // expected handover, YYYY-MM-DD
+  pm            String?
+  btJobName     String?                   // the job's name in BuilderTrend, for matching its schedule items
+  btJobId       String?                   // BuilderTrend's job id, when known
+  notes         String?
+  source        String   @default("manual") // manual | csv | lead | seed | xero | buildertrend
+  claims        JobClaim[]
+  costLines     JobCostLine[]
+  bills         JobBill[]
+  labour        JobLabour[]
+  materials     JobMaterial[]
+  tasks         JobTask[]
+  snapshots     JobSnapshot[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([brand, status])
+}
+
+/// One claim in the job's own signed payment schedule.
+model JobClaim {
+  id            String   @id @default(cuid())
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  seq           Int
+  name          String                    // e.g. Deposit, Sheeting complete
+  pct           Float                     // % of contract
+  amount        Float                     // ex GST
+  hook          String?                   // milestone that triggers it
+  invoiceNumber String?
+  status        String   @default("Not due") // Not due | Draft | Authorised | Paid
+  invoicedDate  String?
+  dueDate       String?
+  receivedInc   Float    @default(0)      // cash received, inc GST
+  issueOn       String?                   // manual issue date (overrides the one worked out from the program)
+  noticeSoonAt  DateTime?                 // accounts told it's coming up
+  noticeReadyAt DateTime?                 // accounts told it's ready to invoice
+  notes         String?
+  source        String   @default("manual")
+  @@index([jobId, seq])
+}
+
+/// A trade / cost line. paid = null means Pending (unknown), never $0.
+model JobCostLine {
+  id         String   @id @default(cuid())
+  jobId      String
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  trade      String
+  supplier   String?
+  cost       Float    @default(0)     // quote / allowance, ex GST
+  costStatus String   @default("Quoted") // Quoted | Provisional | Locked
+  paid       Float?                   // ex GST; null = Pending (unless labour/materials/bills are linked)
+  claimSeq   Int?                     // which claim this trade sits against
+  notes      String?
+  source     String   @default("manual")
+  sort       Int      @default(0)
+  bills      JobBill[]
+  labour     JobLabour[]
+  materials  JobMaterial[]
+  @@index([jobId])
+}
+
+/// A supplier / subcontractor invoice on the job (from Xero later).
+model JobBill {
+  id            String   @id @default(cuid())
+  jobId         String
+  job           Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  costLineId    String?
+  costLine      JobCostLine? @relation(fields: [costLineId], references: [id], onDelete: SetNull)
+  supplier      String
+  invoiceNumber String?
+  amount        Float                   // ex GST
+  status        String   @default("Authorised") // Draft | Authorised | Paid
+  dueDate       String?
+  paidDate      String?
+  claimSeq      Int?                    // null = not mapped to a claim
+  notes         String?
+  source        String   @default("manual")
+  externalId    String?  @unique
+  @@index([jobId])
+}
+
+/// In-house labour (BuilderTrend Time Clock).
+model JobLabour {
+  id         String   @id @default(cuid())
+  jobId      String
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  costLineId String?
+  costLine   JobCostLine? @relation(fields: [costLineId], references: [id], onDelete: SetNull)
+  date       String                   // YYYY-MM-DD (or period end)
+  person     String
+  hours      Float
+  rate       Float    @default(0)     // ordinary rate $/h
+  approved   Boolean  @default(false)
+  notes      String?
+  source     String   @default("manual")
+  externalId String?                   // BuilderTrend time clock entry id (kept unique in code)
+  @@index([jobId])
+  @@index([externalId])
+}
+
+/// Materials receipts.
+model JobMaterial {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  costLineId  String?
+  costLine    JobCostLine? @relation(fields: [costLineId], references: [id], onDelete: SetNull)
+  date        String
+  supplier    String
+  description String?
+  amount      Float                   // ex GST
+  source      String   @default("manual")
+  externalId  String?                 // Xero bank transaction line (kept unique in code)
+  @@index([jobId])
+  @@index([externalId])
+}
+
+/// Build program task (BuilderTrend schedule / Gantt).
+model JobTask {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  name      String
+  start     String                    // YYYY-MM-DD
+  finish    String
+  claimSeq  Int?                      // claim this task's completion supports (null = to confirm)
+  done      Boolean  @default(false)
+  source    String   @default("manual")
+  externalId String?                     // BuilderTrend calendar event id (kept unique in code)
+  @@index([jobId, start])
+  @@index([externalId])
+}
+
+/// Weekly snapshot of a job's WIP numbers, for "what changed this week".
+model JobSnapshot {
+  id        String   @id @default(cuid())
+  jobId     String
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  weekOf    String                    // Monday, YYYY-MM-DD
+  json      String
+  createdAt DateTime @default(now())
+  @@unique([jobId, weekOf])
+}
+
+/// Small key/value store for integration settings (values may be encrypted).
+model IntegrationSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+/// A message to accounts about a claim (coming up / ready to invoice). Shown on the Accounts page and sent out.
+model ClaimNotice {
+  id         String   @id @default(cuid())
+  jobId      String
+  claimId    String
+  kind       String                   // soon | ready
+  issueOn    String                   // the planned issue date when sent
+  amountInc  Float
+  title      String
+  body       String
+  emailed    String   @default("not sent") // sent | not sent (no email service) | failed
+  reminderId String?                  // Anita / Todoist reminder
+  seenAt     DateTime?
+  createdAt  DateTime @default(now())
+  @@index([createdAt])
+  @@index([claimId])
+}
+
+// ===================== My Day: calendar, to-dos, KPIs =====================
+/// A calendar event. source "crm" = made here (editable); "google" = read from the person's Google Calendar.
+model CalEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  title      String
+  start      DateTime
+  end        DateTime
+  allDay     Boolean  @default(false)
+  location   String?
+  notes      String?
+  private    Boolean  @default(false)  // shows as "Busy" on the team calendar
+  source     String   @default("crm")
+  externalId String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([userId, start])
+  @@index([start])
+  @@index([externalId])
+}
+
+/// A task (like a Todoist task). Changing its date or ticking it updates this same row: no copies.
+model Todo {
+  id          String    @id @default(cuid())
+  userId      String
+  externalId  String?   // e.g. the Todoist task id, so an assistant can sync without duplicates
+  text        String    // title, e.g. "Call Dad for his birthday"
+  description String?   // details, contact info, links
+  project     String?   // e.g. "ENP", "Personal"
+  section     String?   // section within the project
+  date        String?   // due date YYYY-MM-DD (Brisbane); empty = no date (inbox)
+  time        String?   // due time HH:MM when specified
+  deadline    String?   // a hard deadline YYYY-MM-DD, separate from the due date
+  recurrence  String?   // daily | weekdays | weekly | fortnightly | monthly | yearly | every N days
+  priority    Int       @default(4) // 1 = P1 (highest) … 4 = P4 (normal), as in Todoist
+  labels      String?   // comma-separated, e.g. "crm-follow-up,calls"
+  parentId    String?   // subtask of this task
+  done        Boolean   @default(false)
+  doneAt      DateTime?
+  sort        Int       @default(0)
+  source      String    @default("crm") // crm | assistant | assigned
+  assignedBy  String?   // name of whoever gave this task to the person (they can tick it off, not change or delete it)
+  assignedById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+  completions TodoCompletion[]
+  @@index([userId, date])
+  @@index([userId, externalId])
+  @@index([parentId])
+}
+
+/// Every time a task is ticked off (repeating tasks tick off many times). Used for "finished today" and the team email.
+model TodoCompletion {
+  id          String   @id @default(cuid())
+  todoId      String
+  todo        Todo     @relation(fields: [todoId], references: [id], onDelete: Cascade)
+  userId      String
+  title       String   // the title when it was ticked off
+  project     String?
+  dueDate     String?  // the date it was due when ticked off
+  completedAt DateTime @default(now())
+  date        String   // Brisbane date it was ticked off
+  @@index([userId, date])
+}
+
+/// A KPI for one person. source "manual" = entries logged by hand; otherwise measured from the CRM.
+model Kpi {
+  id      String     @id @default(cuid())
+  userId  String
+  name    String
+  unit    String?    // e.g. calls, $, quotes
+  target  Float
+  period  String     @default("week") // day | week | month
+  source  String     @default("manual")
+  setBy   String?    // name of the manager who set it; the person can't change or delete it
+  active  Boolean    @default(true)
+  sort    Int        @default(0)
+  entries KpiEntry[]
+  createdAt DateTime @default(now())
+  @@index([userId])
+}
+
+model KpiEntry {
+  id        String   @id @default(cuid())
+  kpiId     String
+  kpi       Kpi      @relation(fields: [kpiId], references: [id], onDelete: Cascade)
+  date      String   // YYYY-MM-DD
+  value     Float
+  note      String?
+  createdAt DateTime @default(now())
+  @@index([kpiId, date])
+}

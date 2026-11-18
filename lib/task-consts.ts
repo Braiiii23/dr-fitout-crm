@@ -1,0 +1,1 @@
+export const REPEATS: [string, string][] = [["", "Doesn't repeat"], ["daily", "Every day"], ["weekdays", "Every weekday"], ["weekly", "Every week"], ["fortnightly", "Every fortnight"], ["monthly", "Every month"], ["yearly", "Every year"]];
