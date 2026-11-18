@@ -684,3 +684,31 @@ model ConceptFit {
   createdAt DateTime @default(now())
   @@index([leaseId])
 }
+
+/// My Day notice board: updates and progress everyone can see. authorId null = posted by the CRM itself.
+model Notice {
+  id         String   @id @default(cuid())
+  authorId   String?
+  authorName String
+  category   String   @default("Update") // Update | Progress | Win | Heads up | Site
+  body       String
+  link       String?                     // in-app path, e.g. /leases/abc
+  linkLabel  String?
+  pinned     Boolean  @default(false)
+  auto       Boolean  @default(false)    // made by the CRM (stage moves, signed leads, concept fits)
+  replies    NoticeReply[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([pinned, createdAt])
+}
+
+model NoticeReply {
+  id         String   @id @default(cuid())
+  noticeId   String
+  notice     Notice   @relation(fields: [noticeId], references: [id], onDelete: Cascade)
+  authorId   String?
+  authorName String
+  body       String
+  createdAt  DateTime @default(now())
+  @@index([noticeId])
+}

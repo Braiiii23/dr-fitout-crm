@@ -68,7 +68,7 @@ export default async function LeasePage({ params, searchParams }: { params: Prom
               </select></label>
               <label><span className="label">Anything to change? (optional)</span><input name="brief" className="input" placeholder="e.g. 5 consult rooms not 6, add a procedure room, keep the existing kitchenette" /></label>
               <div className="self-end"><PendingButton pending="Designing… (up to a minute)">{fits.length ? "Fit another concept" : "Fit concept to this tenancy"}</PendingButton></div>
-              <p className="text-xs admin-muted sm:col-span-3">Uses floor plan: <a className="underline" href={`/files/${floorPlan.id}`} target="_blank" rel="noreferrer">{floorPlan.name}</a>.{lease.status === "Enquiring" ? " The lease moves to Concept proposing." : ""}{aiReady ? "" : " ⚠ The AI isn't set up yet: add XAI_API_KEY on the server."}</p>
+              <p className="text-xs admin-muted sm:col-span-3">Uses floor plan: <a className="underline" href={`/files/${floorPlan.id}`} target="_blank" rel="noreferrer">{floorPlan.name}</a>.{lease.status === "Enquiring" ? " The lease moves to Concept proposing." : ""}{aiReady ? "" : " ⚠ Claude isn't set up yet: add ANTHROPIC_API_KEY on the server."}</p>
             </form>
           )
         )}

@@ -12,8 +12,8 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/api/internal/")) return NextResponse.next();
   // Personal calendar feeds (private token in the address) for Google / Outlook to subscribe to.
   if (pathname.startsWith("/cal/")) return NextResponse.next();
-  // Grok full access: GROK_ADMIN_KEY is checked inside each /api/grok route.
-  if (pathname === "/api/grok" || pathname.startsWith("/api/grok/")) return NextResponse.next();
+  // The Claude connector (remote MCP server): CLAUDE_CONNECTOR_KEY is checked inside the route.
+  if (pathname === "/api/mcp") return NextResponse.next();
   if (pathname.startsWith("/login") || pathname.startsWith("/_next") || pathname === "/favicon.ico" || pathname.startsWith("/brand/") || pathname.startsWith("/icons/") || pathname === "/manifest.webmanifest" || pathname === "/icon.png") return NextResponse.next();
   const s = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!s) return NextResponse.redirect(new URL("/login", req.url));

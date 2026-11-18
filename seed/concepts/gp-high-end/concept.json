@@ -1,0 +1,27 @@
+{
+ "name": "High-End GP Clinic (premium private GP)",
+ "practiceType": "GP clinic",
+ "status": "Ready",
+ "minSqm": 240, "maxSqm": 360,
+ "tags": "premium, private billing, boutique hotel feel, fluted timber, arched portal, 6 consults, procedure room, Rev A",
+ "description": "Premium private-billing general practice that feels like a boutique hotel or wellness retreat, not a bulk-billing clinic. Designed for an assumed c. 300 m² tenancy (c. 20 x 15 m, one glazed shopfront, rear service access). Designed to the intent of the RACGP Standards for general practices 5th ed.\n\nKEY DESIGN MOVES\n- Concierge curved reception with direct sight to the entry, lounge, quiet waiting and the clinical portal.\n- Quiet / infectious waiting by the door: own glazed room, separate exhaust [TBC]; nearest consult is Consult 1 (isolation-capable).\n- Arched portal splits the public lounge from the clinical zone.\n- Public zone along the shopfront: lounge, concierge, refreshment point, quiet / infectious waiting and accessible WC.\n- Six generous consults (14.4–14.7 m²), clinician desk at the door side for a clear exit, couch behind a curtain, hand basin in every consult.\n- Treatment / nurse suite + procedure room interconnect; dirty utility next door (clean-to-dirty flow). Discreet pathology off the clinical portal.\n- Private exit / discharge route via the rear corridor door (second exit, subject to certifier) [TBC].\n- Staff lounge, practice manager office and stores off a back-of-house spine, away from patients.\n- Corridors: 1600 mm clear clinical corridor (E-W) and a 1600 mm back-of-house spine (N-S) to the rear exit.\n- Partitions to slab, acoustic insulated, Rw 45 min / Rw 50 target to consults.",
+ "finishes": "Fluted timber veneer joinery (oak or American walnut [TBC]) to the concierge desk, back counter, refreshment point and consult storage walls; solid-surface (acrylic) tops; arched forms; warm layered light (cove + pendants 3000–3500K [TBC]); upholstered acoustic panels; art and planting; timber-look engineered floor or carpet tile in public areas, sheet vinyl in clinical rooms [TBC]; subtle DR Fitout violet accents at the portal, in pinstripes and handles.",
+ "rooms": [
+  {"name": "Lounge waiting", "qty": 1, "areaSqm": 48.8, "notes": "Patient lounge & arrival; 10.2 x 6.2 L-shaped; on the shopfront; clear sightline from reception; 1500 turning circles"},
+  {"name": "Concierge reception", "qty": 1, "areaSqm": 11.2, "notes": "Patient lounge & arrival; 4.0 x 2.8 curved desk facing entry; accessible low section"},
+  {"name": "Quiet / infectious waiting", "qty": 1, "areaSqm": 12.2, "notes": "Patient lounge & arrival; 3.4 x 3.6 beside the entry; obscure glazed screen; own exhaust [TBC]"},
+  {"name": "Refreshment point", "qty": 1, "areaSqm": 2.6, "notes": "Patient lounge & arrival; 1.0 x 2.6; water point"},
+  {"name": "Accessible WC", "qty": 1, "areaSqm": 6.2, "notes": "Amenities; 2.4 x 2.6; AS 1428.1-2021; baby change [TBC]"},
+  {"name": "Pathology collection", "qty": 1, "areaSqm": 6.4, "notes": "Clinical; 3.2 x 2.0; discreet door off the clinical portal"},
+  {"name": "Consult room", "qty": 6, "areaSqm": 14.4, "notes": "Consult; 4.5 x 3.2 or 3.6 x 4.0; doctor desk at door side, exam couch + curtain, HB; Consult 1 isolation-capable nearest portal (14.7 m²)"},
+  {"name": "Ambulant / patient WC", "qty": 1, "areaSqm": 2.6, "notes": "Amenities; 1.0 x 2.6; specimen hatch to pathology option"},
+  {"name": "Cleaner", "qty": 1, "areaSqm": 2.3, "notes": "Support; 1.8 x 1.3"},
+  {"name": "Clean store", "qty": 1, "areaSqm": 2.3, "notes": "Support; 1.8 x 1.3"},
+  {"name": "Records / comms", "qty": 1, "areaSqm": 3.9, "notes": "Support; 2.8 x 1.4; ventilated rack"},
+  {"name": "Treatment / nurse suite (2 bays)", "qty": 1, "areaSqm": 22.1, "notes": "Clinical; 4.8 x 4.6; nurse station, vaccine fridge, emergency trolley; interconnects with procedure room"},
+  {"name": "Procedure room", "qty": 1, "areaSqm": 15.4, "notes": "Clinical; 4.8 x 3.2; procedure light, scrub HB; next to dirty utility"},
+  {"name": "Dirty utility / reprocessing", "qty": 1, "areaSqm": 8.6, "notes": "Support; 4.8 x 1.8; clean-to-dirty flow from treatment / procedure"},
+  {"name": "Practice manager", "qty": 1, "areaSqm": 10.6, "notes": "Staff & admin; 4.8 x 2.2; acoustic privacy; off back-of-house spine"},
+  {"name": "Staff lounge", "qty": 1, "areaSqm": 15.4, "notes": "Staff & admin; 4.8 x 3.2; kitchenette, lockers; off back-of-house spine near rear exit"}
+ ]
+}

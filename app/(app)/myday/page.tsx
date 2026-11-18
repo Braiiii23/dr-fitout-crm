@@ -7,6 +7,7 @@ import { ProductivityBar, WeekCalendar, EventForm, colourFor, type CalItem } fro
 import KpiFields from "@/components/KpiFields";
 import TaskList from "@/components/TaskList";
 import GiveTask from "@/components/GiveTask";
+import NoticeBoard from "@/components/NoticeBoard";
 import { saveKpi, deleteKpi, logKpi, saveGoogleLink, syncGoogleNow } from "./actions";
 
 const fmtNum = (k: { unit: string | null }, n: number) => (k.unit === "%" ? `${Math.round(n)}%` : k.unit === "$" ? `$${Math.round(n).toLocaleString("en-AU")}` : Math.round(n * 10) / 10 + (k.unit ? ` ${k.unit}` : ""));
@@ -60,6 +61,8 @@ export default async function MyDay({ searchParams }: { searchParams: Promise<Re
       </div>
 
       <ProductivityBar score={p.score} level={p.hasData ? p.level : "Add a to-do to get started"} todosDone={todos.filter((t) => t.done).length} todosTotal={todos.length} kpiPace={kpiPace} streak={st} />
+
+      <NoticeBoard u={u} filter={sp.board} />
 
       <div className="md-grid">
         {/* ---------- tasks ---------- */}

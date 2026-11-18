@@ -4,6 +4,8 @@ import { requireUser } from "@/lib/auth";
 import { Flash, PageTitle } from "@/components/ui";
 import { CLIENT_TYPES } from "@/lib/leases";
 import { parseFiles, parseRooms, roomsTotal } from "@/lib/concepts";
+import { importPackage } from "./actions";
+import PendingButton from "@/components/PendingButton";
 
 const EDITORS = ["ADMIN", "BDM", "PM", "ESTIMATOR"];
 
@@ -24,6 +26,13 @@ export default async function ConceptsPage({ searchParams }: { searchParams: Pro
         {canEdit && <Link prefetch={false} href="/concepts/new" className="btn">+ New concept</Link>}
       </PageTitle>
       <Flash msg={sp.msg} /><Flash msg={sp.err} kind="err" />
+      {canEdit && (
+        <form action={importPackage} className="dash-panel flex flex-wrap items-end gap-3">
+          <div className="min-w-[16rem] flex-1"><h2 className="mb-0">Import a concept package</h2><p className="text-xs admin-muted">Upload the A3 concept package PDF. Claude reads the design narrative, key design moves, room schedule and finishes, and keeps the floor plan page for fitting to tenancies.</p></div>
+          <label><span className="label">Package PDF</span><input type="file" name="package" accept=".pdf" required className="input" /></label>
+          <PendingButton pending="Reading the package… (up to 2 minutes)">Import</PendingButton>
+        </form>
+      )}
       <form className="flex flex-wrap items-center gap-2">
         <input name="q" defaultValue={q} placeholder="Search name, intent, tags…" className="input max-w-md" />
         {type && <input type="hidden" name="type" value={type} />}

@@ -4,7 +4,7 @@ export type StoredFile = { id: string; name: string; kind: string; added: string
 
 export const CONCEPT_STATUSES = ["Draft", "Ready", "Archived"];
 export const LEASE_FILE_KINDS = ["floor plan", "lease", "other"];
-export const CONCEPT_FILE_KINDS = ["image", "plan", "other"];
+export const CONCEPT_FILE_KINDS = ["image", "plan", "package", "other"];
 
 export const parseFiles = (s?: string | null): StoredFile[] => { try { const v = s ? JSON.parse(s) : []; return Array.isArray(v) ? v : []; } catch { return []; } };
 export const parseRooms = (s?: string | null): Room[] => { try { const v = s ? JSON.parse(s) : []; return Array.isArray(v) ? v : []; } catch { return []; } };

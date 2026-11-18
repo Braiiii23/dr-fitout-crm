@@ -1,0 +1,27 @@
+{
+ "name": "Mixed Allied Health Centre (multidisciplinary)",
+ "practiceType": "Allied health",
+ "status": "Ready",
+ "minSqm": 320, "maxSqm": 480,
+ "tags": "physio, pilates / EP, podiatry, psychology wing, OT / speech, dietetics, gym on shopfront, same design family as premium GP, Rev A",
+ "description": "Quality, contemporary multidisciplinary allied health centre in the same design family as the DR Fitout premium GP concept. Designed for an assumed c. 400 m² tenancy (c. 25 x 16 m, one glazed shopfront to the south, rear service access).\n\nKEY DESIGN MOVES\n- Active / quiet split: gym, Pilates / EP studio and physio sit on one side (east); the psychology wing sits on the other (west) behind an acoustic door.\n- Gym on the shopfront as visible 'shop window' activity, with a 10 m gait track along the glazing [TBC].\n- Shared concierge reception + retail display (orthotics), wide open waiting with clear 1800 mm corridors.\n- Quiet wing: its own discreet waiting, hot-desk practitioner office and a discreet rear exit for psychology clients [TBC]; 1600 mm quiet-wing corridor behind an acoustic door, carpet tile and sound masking.\n- Rear spine (1800 mm) to service access: staff room, laundry / cleaner, equipment store, change room / shower and second exit [TBC].\n- Accessible WC with shower plus ambulant WC off the waiting area.",
+ "finishes": "Warm timber, fluted joinery, soft layered light and subtle violet accents with clinical-grade surfaces (same family as the premium GP). Gym / rehab floor: commercial rubber or sports vinyl (8–10 mm [TBC]) on acoustic / impact underlay, 10 m gait track inlaid in a contrasting colour with 1 m markings. Curved concierge desk in fluted timber veneer with solid-surface top; retail display joinery; carpet tile and sound masking in the psychology wing; acoustic panels; planting.",
+ "rooms": [
+  {"name": "Waiting, retail & arrival", "qty": 1, "areaSqm": 42.2, "notes": "Arrival / waiting; 8.0 x 6.6; mixed lounge seating incl. bariatric chair; orthotics retail display"},
+  {"name": "Concierge reception", "qty": 1, "areaSqm": 10.6, "notes": "Arrival; 3.8 x 2.8; curved fluted timber desk, low accessible section"},
+  {"name": "Podiatry", "qty": 1, "areaSqm": 15.2, "notes": "Clinical; 3.8 x 4.0; powered chair, HB, dust extraction"},
+  {"name": "Accessible WC + shower", "qty": 1, "areaSqm": 6.8, "notes": "Amenities; 2.6 x 2.6"},
+  {"name": "Ambulant WC", "qty": 1, "areaSqm": 3.1, "notes": "Amenities; 1.2 x 2.6"},
+  {"name": "Physio gym / rehab floor", "qty": 1, "areaSqm": 87.1, "notes": "Active zone; 13.2 x 6.6; on the shopfront; 10 m gait track along the glazing"},
+  {"name": "Pilates / EP studio", "qty": 1, "areaSqm": 48.6, "notes": "Active zone; 7.6 x 6.4; 5 reformers, mirror wall"},
+  {"name": "Physio treatment", "qty": 2, "areaSqm": 12.2, "notes": "Clinical; 3.8 x 3.2; height-adjustable plinth, HB, curtain"},
+  {"name": "Staff room", "qty": 1, "areaSqm": 11.4, "notes": "Staff; 3.8 x 3.0; off the rear spine"},
+  {"name": "Laundry / cleaner", "qty": 1, "areaSqm": 7.8, "notes": "Support; 2.6 x 3.0; towels washer / dryer; off the rear spine"},
+  {"name": "Change room / shower", "qty": 1, "areaSqm": 7.8, "notes": "Amenities; 2.6 x 3.0"},
+  {"name": "Equipment store", "qty": 1, "areaSqm": 7.2, "notes": "Support; 2.4 x 3.0; off the rear spine"},
+  {"name": "Flex consult (OT / speech / dietetics)", "qty": 2, "areaSqm": 12.2, "notes": "Flexible consult; 3.2 x 3.8"},
+  {"name": "Psychology room", "qty": 3, "areaSqm": 13.2, "notes": "Quiet wing; 3.6 x 3.8 (one 3.4 x 3.6); armchairs, acoustic panels, soft lighting"},
+  {"name": "Psych quiet waiting", "qty": 1, "areaSqm": 6.8, "notes": "Quiet wing; 3.4 x 2.0; discreet"},
+  {"name": "Hot-desk practitioner office", "qty": 1, "areaSqm": 6.8, "notes": "Staff; 3.4 x 2.0; in the quiet wing"}
+ ]
+}

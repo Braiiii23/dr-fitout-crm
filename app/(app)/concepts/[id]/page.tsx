@@ -42,7 +42,7 @@ export default async function ConceptPage({ params, searchParams }: { params: Pr
         <aside className="space-y-4">
           <div className="card text-sm">
             <h2 className="lease-h2">Room schedule</h2>
-            {rooms.length ? <table className="table"><tbody>{rooms.map((r, i) => <tr key={i}><td>{r.qty} ×</td><td>{r.name}{r.notes && <div className="text-xs admin-muted">{r.notes}</div>}</td><td className="text-right">{r.areaSqm ? `${r.areaSqm} m²` : ""}</td></tr>)}</tbody></table> : <p className="admin-muted">No rooms listed yet.</p>}
+            {rooms.length ? <table className="table concept-rooms"><tbody>{rooms.map((r, i) => <tr key={i}><td>{r.qty} ×</td><td>{r.name}{r.notes && <div className="text-xs admin-muted">{r.notes}</div>}</td><td className="text-right">{r.areaSqm ? `${r.areaSqm} m²` : ""}</td></tr>)}</tbody></table> : <p className="admin-muted">No rooms listed yet.</p>}
             {rooms.length > 0 && <p className="mt-2 font-semibold">{Math.round(roomsTotal(rooms))} m² of rooms <span className="admin-muted font-normal">(+ circulation, usually 20–30%)</span></p>}
           </div>
           <div className="card text-sm">

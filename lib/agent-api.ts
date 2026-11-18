@@ -1,5 +1,4 @@
 import "server-only";
-import { NextResponse } from "next/server";
 import { timingSafeEqual, createHash } from "crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
@@ -7,20 +6,19 @@ import { audit, runLeadAutomations, runCallAutomations, stageSideEffects } from 
 import { fillGpOnSign } from "./job-estimate";
 import { ensureJobForLead } from "./job-from-lead";
 
-// Grok's full access: read everything, create and change records like the admin would.
+// Claude's access to the CRM (the Claude connector at /api/mcp): read everything, create and change records like the admin would.
 // Not allowed: deleting anything, changing the software, logins/passwords (User), and the Xero / BuilderTrend connections and settings store.
-// Auth: Authorization: Bearer <GROK_ADMIN_KEY>. Every change is recorded in the audit log as "grok".
-
-export const json = (d: unknown, status = 200) => NextResponse.json(d, { status, headers: { "Cache-Control": "no-store" } });
+// Auth: Authorization: Bearer <CLAUDE_CONNECTOR_KEY>. Every change is recorded in the audit log as "claude".
 
 const hits: number[] = [];
-export function grokAuth(req: Request): NextResponse | null {
-  const key = process.env.GROK_ADMIN_KEY ?? "";
-  if (key.length < 24) return json({ ok: false, error: "Grok access is switched off (GROK_ADMIN_KEY isn't set)." }, 503);
+/** Checks the connector key. Returns an error message, or null when the request may go ahead. */
+export function agentAuthError(req: Request): { status: number; error: string } | null {
+  const key = process.env.CLAUDE_CONNECTOR_KEY ?? "";
+  if (key.length < 24) return { status: 503, error: "The Claude connector is switched off (CLAUDE_CONNECTOR_KEY isn't set)." };
   const got = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim() || (req.headers.get("x-api-key") ?? "").trim();
-  if (!got || !timingSafeEqual(createHash("sha256").update(got).digest(), createHash("sha256").update(key).digest())) return json({ ok: false, error: "Unauthorised" }, 401);
+  if (!got || !timingSafeEqual(createHash("sha256").update(got).digest(), createHash("sha256").update(key).digest())) return { status: 401, error: "Unauthorised" };
   const now = Date.now(); while (hits.length && now - hits[0] > 60000) hits.shift(); hits.push(now);
-  if (hits.length > 240) return json({ ok: false, error: "Too many requests: slow down to 240 a minute." }, 429);
+  if (hits.length > 240) return { status: 429, error: "Too many requests: slow down to 240 a minute." };
   return null;
 }
 
@@ -30,7 +28,9 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
   clients: { model: "Client", write: true, about: "Client practices. Link leads/jobs/leases with their clientId." },
   leases: { model: "Lease", write: true, about: "Tenancies. status (stage): Enquiring | Concept proposing | Sign. Dates YYYY-MM-DD. files is managed by the app." },
   concepts: { model: "Concept", write: true, about: "Concept designs. rooms is JSON [{name, qty, areaSqm, notes}]. files is managed by the app." },
-  "concept-fits": { model: "ConceptFit", write: false, about: "AI test fits of a concept onto a lease's floor plan (read only; run one with POST /api/grok/actions/concept-fit)" },
+  "concept-fits": { model: "ConceptFit", write: false, about: "AI test fits of a concept onto a lease's floor plan (read only; run one with the concept_fit tool)" },
+  notices: { model: "Notice", write: true, about: "My Day notice board posts (category: Update | Progress | Win | Heads up | Site; link = in-app path like /leases/{id}). Posts show as from Claude." },
+  "notice-replies": { model: "NoticeReply", write: true, about: "Replies on notice board posts (noticeId + body). Show as from Claude." },
   directory: { model: "CallListItem", write: true, about: "The Directory: designers, leasing agents, landlords, clients and trades (business is always DR)" },
   "trade-quotes": { model: "TradeQuote", write: true, about: "Estimating: trade quotes on a lead's trade pack" },
   "scope-items": { model: "ScopeItem", write: true, about: "Estimating: scope of works items" },
@@ -56,9 +56,10 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
 const LOCKED: Record<string, string[]> = {
   CallListItem: ["slotId", "setterId", "business"], Lead: ["brand", "setterId"], Job: ["brand"],
   Lease: ["files"], Concept: ["files"], ConceptFit: ["result"],
+  Notice: ["authorId", "authorName", "auto"], NoticeReply: ["authorId", "authorName"],
 };
 /** Values Grok can't choose: this is a DR Fitout-only CRM. */
-export const FIXED: Record<string, Record<string, unknown>> = { Lead: { brand: "DR" }, Job: { brand: "DR" }, CallListItem: { business: "DR" } };
+export const FIXED: Record<string, Record<string, unknown>> = { Lead: { brand: "DR" }, Job: { brand: "DR" }, CallListItem: { business: "DR" }, Notice: { authorName: "Claude" }, NoticeReply: { authorName: "Claude" } };
 const ALWAYS_LOCKED = ["id", "createdAt", "updatedAt"];
 
 type Field = { name: string; kind: string; type: string; isRequired: boolean; isList: boolean; hasDefaultValue: boolean };
@@ -86,6 +87,8 @@ export function coerce(model: string, body: Record<string, unknown>, creating: b
   }
   if (model === "Lease" && typeof data.status === "string" && !["Enquiring", "Concept proposing", "Sign"].includes(data.status)) errors.push("status must be Enquiring | Concept proposing | Sign");
   if (model === "Lead" && typeof data.category === "string" && !["Turnkey fitout", "Joint venture", "Normal fitout"].includes(data.category)) errors.push("category must be Turnkey fitout | Joint venture | Normal fitout");
+  if (model === "Notice" && typeof data.category === "string" && !["Update", "Progress", "Win", "Heads up", "Site"].includes(data.category)) errors.push("category must be Update | Progress | Win | Heads up | Site");
+  if (model === "Notice" && typeof data.link === "string" && !/^\/[A-Za-z0-9/_?=&#.%-]*$/.test(data.link)) errors.push("link must be an in-app path like /leases/{id}");
   if (creating) for (const f of writableFields(model)) if (f.isRequired && !f.hasDefaultValue && !(f.name in data)) errors.push(`${f.name} is required`);
   return { data, errors };
 }
@@ -95,7 +98,7 @@ export function appendTo(existing: string | null | undefined, text: unknown) {
   const t = typeof text === "string" ? text.trim() : "";
   if (!t) return existing ?? null;
   const stamp = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Brisbane", day: "numeric", month: "short", year: "numeric" }).format(new Date());
-  return [existing?.trimEnd(), `${stamp} (Grok): ${t}`].filter(Boolean).join("\n\n");
+  return [existing?.trimEnd(), `${stamp} (Claude): ${t}`].filter(Boolean).join("\n\n");
 }
 const NOTES_FIELD: Record<string, string> = { Lead: "notes", CallListItem: "callNotes", Job: "notes", JobClaim: "notes", JobCostLine: "notes", JobBill: "notes", JobLabour: "notes", Client: "notes", Lease: "notes" };
 export const notesField = (model: string) => NOTES_FIELD[model] ?? null;
@@ -112,7 +115,7 @@ export async function afterWrite(model: string, id: string, before: Record<strin
   if (model === "CallListItem") await runCallAutomations(id);
 }
 
-export async function grokAudit(action: string, model: string, id: string | undefined, detail: string) { await audit("grok", action, model, id, detail.slice(0, 500)); }
+export async function agentAudit(action: string, model: string, id: string | undefined, detail: string) { await audit("claude", action, model, id, detail.slice(0, 500)); }
 
 /** What changed, for the reply. */
 export function diff(before: Record<string, unknown> | null, after: Record<string, unknown>) {
@@ -123,4 +126,83 @@ export function diff(before: Record<string, unknown> | null, after: Record<strin
     if (!same) out[k] = { from: b ?? null, to: v };
   }
   return out;
+}
+
+// ---------- Operations (used by the MCP tools) ----------
+type Out = Record<string, unknown>;
+const lastLine = (e: unknown) => (e as Error).message.split("\n").slice(-1)[0];
+const table = (name: string) => { const r = RESOURCES[name]; if (!r) throw new Error(`Unknown table "${name}". Use crm_overview to see the tables.`); return r; };
+
+export function overview(): Out {
+  return {
+    actingAs: "the admin, recorded in the audit log as \"claude\"", timezone: "Australia/Brisbane", business: "DR Fitout (medical / allied-health fitouts, Brisbane). Spelt \"DR Fitout\", singular.",
+    rules: ["No deleting anything.", "No changes to the software itself.", "No logins, passwords or user accounts.", "No Xero / BuilderTrend connection settings.", "DR Fitout only: brand is always DR.",
+      "Read a record before changing it, and use dryRun first.", "Use appendNotes to add a dated note; it never replaces what's there.", "Money is ex GST unless a field says Inc. Dates are YYYY-MM-DD.", "Don't invent values: leave unknowns blank and say so."],
+    tables: Object.fromEntries(Object.entries(RESOURCES).map(([name, r]) => [name, {
+      about: r.about, canChange: r.write,
+      fields: scalarFields(r.model).map((f) => `${f.name}: ${f.type}${f.isRequired ? "" : "?"}`),
+      ...(r.write ? { writable: writableFields(r.model).map((f) => f.name) } : {}),
+    }])),
+  };
+}
+
+export async function listRows(name: string, a: { q?: string; where?: unknown; orderBy?: unknown; limit?: number; offset?: number }): Promise<Out> {
+  const r = table(name);
+  let where = (a.where && typeof a.where === "object" ? a.where : {}) as Record<string, unknown>;
+  const q = (a.q ?? "").trim();
+  if (q) {
+    const textFields = scalarFields(r.model).filter((f) => f.type === "String" && /name|company|title|trade|supplier|client|email|phone|description|person|invoiceNumber|jobNumber|premises|suburb|centre|landlord|tags/i.test(f.name)).map((f) => f.name);
+    where = { AND: [where, { OR: textFields.map((f) => ({ [f]: { contains: q } })) }] };
+  }
+  const take = Math.min(200, Math.max(1, Number(a.limit) || 50)), skip = Math.max(0, Number(a.offset) || 0);
+  try {
+    const [rows, total] = await Promise.all([delegate(r.model).findMany({ where, ...(a.orderBy ? { orderBy: a.orderBy } : {}), take, skip }), delegate(r.model).count({ where })]);
+    return { total, count: rows.length, offset: skip, rows };
+  } catch (e) { throw new Error(`Query failed: ${lastLine(e)}`); }
+}
+
+export async function getRow(name: string, id: string): Promise<Out> {
+  const r = table(name);
+  const row = await delegate(r.model).findUnique({ where: { id } });
+  if (!row) throw new Error("Not found");
+  return { row };
+}
+
+export async function createRow(name: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
+  const r = table(name);
+  if (!r.write) throw new Error(`${name} is read only`);
+  const { data, errors } = coerce(r.model, body, true);
+  Object.assign(data, FIXED[r.model] ?? {});
+  if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
+  const nf = notesField(r.model);
+  if (nf && body.appendNotes) data[nf] = appendTo(data[nf] as string | null, body.appendNotes);
+  if (errors.length) throw new Error(errors.join("; "));
+  if (dryRun) return { dryRun: true, wouldCreate: data };
+  try {
+    const row = await delegate(r.model).create({ data });
+    await afterWrite(r.model, row.id, null);
+    await agentAudit("create", r.model, row.id, Object.keys(data).join(", "));
+    return { created: await delegate(r.model).findUnique({ where: { id: row.id } }) };
+  } catch (e) { throw new Error(`Couldn't create: ${lastLine(e)}`); }
+}
+
+export async function updateRow(name: string, id: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
+  const r = table(name);
+  if (!r.write) throw new Error(`${name} is read only`);
+  const before = await delegate(r.model).findUnique({ where: { id } });
+  if (!before) throw new Error("Not found");
+  const { data, errors } = coerce(r.model, body, false);
+  if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
+  const nf = notesField(r.model);
+  if (body.appendNotes) { if (!nf) errors.push(`${name} has no notes field`); else data[nf] = appendTo((data[nf] as string | undefined) ?? before[nf], body.appendNotes); }
+  if (errors.length) throw new Error(errors.join("; "));
+  const changes = diff(before, data);
+  if (dryRun) return { dryRun: true, changes };
+  if (!Object.keys(changes).length) return { changes: {}, note: "Nothing to change" };
+  try {
+    await delegate(r.model).update({ where: { id }, data });
+    await afterWrite(r.model, id, before);
+    await agentAudit("update", r.model, id, Object.keys(changes).join(", "));
+    return { changes, row: await delegate(r.model).findUnique({ where: { id } }) };
+  } catch (e) { throw new Error(`Couldn't save: ${lastLine(e)}`); }
 }

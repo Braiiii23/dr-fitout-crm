@@ -1,4 +1,5 @@
 "use server";
+import { autoNotice } from "@/lib/notices";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -20,6 +21,7 @@ export async function saveLead(fd: FormData) {
   const setterId = data.setterId as string | null | undefined; delete data.setterId;
   const rel = setterId === undefined ? {} : setterId ? { setter: { connect: { id: setterId } } } : { setter: { disconnect: true } };
   let leadId = id;
+  const prevStage = id ? (await prisma.lead.findUnique({ where: { id }, select: { stage: true } }))?.stage ?? null : null;
   if (id) {
     await prisma.lead.update({ where: { id }, data: { ...data, ...rel } });
   } else {
@@ -33,6 +35,7 @@ export async function saveLead(fd: FormData) {
   await fillGpOnSign(leadId, u.email);
   await ensureJobForLead(leadId);
   await audit(u.email, id ? "update" : "create", "Lead", leadId);
+  await leadNotice(leadId, prevStage, u.name);
   revalidatePath(`/leads/${BRANDS[brand].slug}`);
   redirect(`/leads/${BRANDS[brand].slug}/${leadId}?saved=1`);
 }
@@ -46,6 +49,7 @@ export async function moveStage(fd: FormData) {
   await fillGpOnSign(id, u.email);
   await ensureJobForLead(id);
   await audit(u.email, `stage → ${stage}`, "Lead", id);
+  await leadNotice(id, l.stage, u.name);
   revalidatePath(`/leads/${BRANDS[l.brand as BrandKey].slug}`);
 }
 
@@ -59,3 +63,13 @@ export async function deleteLead(fd: FormData) {
   redirect(`/leads/${BRANDS[l.brand as BrandKey].slug}`);
 }
 
+
+/** Post signed work and quotes going out to the My Day notice board. */
+async function leadNotice(id: string, prevStage: string | null, by: string) {
+  const l = await prisma.lead.findUnique({ where: { id } });
+  if (!l || l.stage === prevStage) return;
+  const who = l.company || l.leadName || "A lead";
+  const $ = (n?: number | null) => (n ? ` · $${Math.round(n).toLocaleString("en-AU")} ex GST` : "");
+  if (l.stage === "Signed") await autoNotice("Win", `Signed: ${who}${l.category ? ` (${l.category})` : ""}${$(l.contractValue)}. Moved by ${by}.`, `/leads/dr/${id}`, "Open lead");
+  else if (l.stage === "Quoting") await autoNotice("Progress", `${who} moved to Quoting${l.category ? ` (${l.category})` : ""}. Moved by ${by}.`, `/leads/dr/${id}`, "Open lead");
+}

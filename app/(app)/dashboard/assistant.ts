@@ -1,6 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
-import { aiConfig } from "@/lib/ai";
+import { aiChat, aiConfig, jsonFrom } from "@/lib/ai";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { BRANDS, CALL_STATUSES, STAGES, type BrandKey } from "@/lib/constants";
@@ -112,26 +112,12 @@ function ruleParse(msg: string): Intent | null {
 async function llmParse(msg: string, names: string[]): Promise<Intent | null> {
   const ai = aiConfig();
   if (!ai) return null;
-  const key = ai.key;
   try {
-    const res = await fetch(ai.url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({
-        model: ai.model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content: `You help Braiden (admin) update CRM leads and calls. Return JSON {"kind":"call_status"|"call_note"|"attempt"|"lead_stage"|"lead_note"|"followup"|"remind"|"none","target":name,"status"?:one of ${JSON.stringify(CALL_STATUSES)},"stage"?:one of ${JSON.stringify(ALL_STAGES)},"note"?:string,"n"?:int,"date"?: "YYYY-MM-DD","due"?:string,"quote"?:boolean}. Known names: ${JSON.stringify(names.slice(0, 250))}. Spelling: DR Fitout (singular). If unclear return {"kind":"none"}.`,
-          },
-          { role: "user", content: msg },
-        ],
-      }),
-    });
-    const j = JSON.parse((await res.json()).choices?.[0]?.message?.content ?? "{}");
+    const { text } = await aiChat({ json: true, temperature: 0, maxTokens: 400, timeoutMs: 15000,
+      system: `You help the DR Fitout admin update CRM leads. Return JSON {"kind":"call_status"|"call_note"|"attempt"|"lead_stage"|"lead_note"|"followup"|"remind"|"none","target":name,"status"?:one of ${JSON.stringify(CALL_STATUSES)},"stage"?:one of ${JSON.stringify(ALL_STAGES)},"note"?:string,"n"?:int,"date"?: "YYYY-MM-DD","due"?:string,"quote"?:boolean}. Known names: ${JSON.stringify(names.slice(0, 250))}. Spelling: DR Fitout (singular). If unclear return {"kind":"none"}.`,
+      messages: [{ role: "user", content: msg }] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const j = jsonFrom<any>(text);
     if (j.kind === "call_status" && CALL_STATUSES.includes(j.status)) return { kind: "call_status", target: String(j.target), status: j.status };
     if (j.kind === "call_note" && j.note) return { kind: "call_note", target: String(j.target), note: String(j.note) };
     if (j.kind === "attempt") return { kind: "attempt", target: String(j.target), n: Math.min(5, Math.max(1, parseInt(j.n, 10) || 1)) };

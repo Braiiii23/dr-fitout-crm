@@ -36,5 +36,6 @@ fi
 
 node_modules/.bin/tsx scripts/ensure-users.ts
 node_modules/.bin/tsx scripts/migrate-lease-stages.ts
+node_modules/.bin/tsx scripts/seed-concepts.ts
 
 exec node_modules/.bin/next start -H 0.0.0.0 -p "${PORT:-3100}"

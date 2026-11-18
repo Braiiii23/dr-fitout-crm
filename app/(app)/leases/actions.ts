@@ -8,6 +8,7 @@ import { LEASE_STATUSES, parseLeaseForm } from "@/lib/leases";
 import { LEASE_FILE_KINDS, parseFiles } from "@/lib/concepts";
 import { saveFile } from "@/lib/files";
 import { runConceptFit } from "@/lib/concept-fit";
+import { autoNotice } from "@/lib/notices";
 
 const EDITORS = ["ADMIN", "BDM", "PM", "ACCOUNTS"] as const;
 
@@ -38,7 +39,9 @@ export async function updateLease(fd: FormData) {
   const id = String(fd.get("id"));
   const data = parseLeaseForm(fd);
   data.clientId = (await newClientFrom(fd)) ?? data.clientId;
+  const before = await prisma.lease.findUnique({ where: { id }, include: { client: { select: { name: true } } } });
   const l = await prisma.lease.update({ where: { id }, data });
+  if (before && before.status !== l.status) await leaseNotice(before, l.status, u.name);
   await audit(u.email, "update", "Lease", id);
   revalidatePath("/leases"); revalidatePath(`/leases/${id}`); revalidatePath("/dashboard");
   if (l.clientId) revalidatePath(`/clients/${l.clientId}`);
@@ -50,8 +53,10 @@ export async function setLeaseStatus(fd: FormData) {
   const id = String(fd.get("id"));
   const status = String(fd.get("status"));
   if (!LEASE_STATUSES.includes(status)) return;
+  const before = await prisma.lease.findUnique({ where: { id }, include: { client: { select: { name: true } } } });
   await prisma.lease.update({ where: { id }, data: { status } });
   await audit(u.email, "status", "Lease", id, status);
+  if (before && before.status !== status) await leaseNotice(before, status, u.name);
   revalidatePath("/leases"); revalidatePath("/dashboard");
 }
 
@@ -127,6 +132,11 @@ export async function runFit(fd: FormData) {
   try {
     const fit = await runConceptFit(id, conceptId, String(fd.get("brief") ?? "").trim().slice(0, 2000), u.name);
     fitId = fit.id; if (fit.status === "error") err = fit.error ?? "The AI couldn't make a fit.";
+    if (fit.status === "done") {
+      const [lz, cz] = await Promise.all([prisma.lease.findUnique({ where: { id }, include: { client: { select: { name: true } } } }), prisma.concept.findUnique({ where: { id: conceptId }, select: { name: true } })]);
+      const v = (() => { try { return JSON.parse(fit.result ?? "{}").verdict as string | undefined; } catch { return undefined; } })();
+      if (lz) await autoNotice("Progress", `Concept fitted: ${cz?.name ?? "a concept"} into ${[lz.tenancy, lz.premises].filter(Boolean).join(", ")}${lz.client ? ` for ${lz.client.name}` : ""}${v ? ` (${v})` : ""}. By ${u.name}.`, `/leases/${id}?fit=${fit.id}`, "See the fit");
+    }
     await prisma.lease.updateMany({ where: { id, status: "Enquiring" }, data: { status: "Concept proposing" } });
     await audit(u.email, "concept fit", "Lease", id, `${conceptId} → ${fit.status}`);
   } catch (e) { err = (e as Error).message; }
@@ -143,4 +153,9 @@ export async function chooseFit(fd: FormData) {
   await audit(u.email, "choose concept fit", "Lease", id, fitId);
   revalidatePath(`/leases/${id}`);
   redirect(`/leases/${id}?fit=${fitId}&msg=${enc("Marked as the concept we're proposing.")}#concept`);
+}
+
+async function leaseNotice(l: { id: string; premises: string; tenancy: string | null; client: { name: string } | null }, status: string, by: string) {
+  const where = [l.tenancy, l.premises].filter(Boolean).join(", ");
+  await autoNotice(status === "Sign" ? "Win" : "Progress", `${status === "Sign" ? "Lease signed" : `Lease moved to ${status}`}: ${where}${l.client ? ` for ${l.client.name}` : ""}. Moved by ${by}.`, `/leases/${l.id}`, "Open lease");
 }

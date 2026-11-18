@@ -8,5 +8,5 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const f = await loadFile(id);
   if (!f) return new Response("Not found", { status: 404 });
-  return new Response(new Uint8Array(f.data), { headers: { "Content-Type": f.meta.type, "Content-Disposition": `inline; filename="${f.meta.name}"`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+  return new Response(new Uint8Array(f.data), { headers: { "Content-Type": f.meta.type, "Content-Disposition": `inline; filename="${f.meta.name.replace(/[^\x20-\x7e]+/g, "-").replace(/["\\]/g, "")}"; filename*=UTF-8''${encodeURIComponent(f.meta.name)}`, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }

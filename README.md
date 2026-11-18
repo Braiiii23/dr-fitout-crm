@@ -13,16 +13,22 @@ My Day · Calendar · Dashboard · Leads · Jobs · WIP · Estimating · Account
   lease page ("…or add a new client" creates one) and the client page. Key dates show on Leases, Dashboard, team Calendar and the assistant.
   Old stage names from v1 are moved onto the new stages on start (`scripts/migrate-lease-stages.ts`).
 - **Concepts** (`/concepts`): our concept library: room schedule (one per line, e.g. `6 x Consult room 12 sqm`), design intent, finishes, images/plans.
-- **AI concept fit** (lease page → Concept design): pick a concept; Grok reads the tenancy floor plan (PDF page 1 via `pdftoppm`, or PNG/JPG)
-  and returns a test-fit layout drawn as a block plan, a room schedule, verdict (Fits / Tight / Doesn't fit), changes, checks and assumptions.
-  `lib/concept-fit.ts`. Saved as `ConceptFit`; star one as the proposal. It's a starting point for the designer, not a buildable drawing.
-- **Grok**: `XAI_API_KEY` powers the in-app assistants and concept fit; `GROK_ADMIN_KEY` turns on the outside API. See `docs/GROK_FULL_ACCESS.md`.
+- **Concept packages**: "Import a concept package" (Concepts page) — Claude reads an A3 package PDF (narrative, key design moves, room schedule,
+  finishes, compliance) into a concept and keeps the cover, the concept floor plan page (kind "plan"), a render and the PDF. `lib/concept-import.ts`.
+  The GP and Allied Health packages ship in `seed/concepts/` and load on first start (`scripts/seed-concepts.ts`).
+- **AI concept fit** (lease page → Concept design): pick a concept; Claude reads the tenancy floor plan (PDF page 1 via `pdftoppm`, or PNG/JPG)
+  plus the concept's own floor plan, and RECREATES the concept for the tenancy (keeps zoning, design moves, adjacencies, corridor widths and room sizes
+  where it can): block plan, room schedule, verdict (Fits / Tight / Doesn't fit), changes, checks, assumptions. `lib/concept-fit.ts`; saved as `ConceptFit`.
+  A starting point for the designer, not a buildable drawing.
+- **My Day notice board**: posts and replies for everyone (admin pins); the CRM auto-posts signed leads, leads to Quoting, lease stage moves, concept fits and imports. `Notice`, `NoticeReply`, `lib/notices.ts`.
+- **Claude**: `ANTHROPIC_API_KEY` powers the in-app AI (`lib/ai.ts`); `CLAUDE_CONNECTOR_KEY` turns on the Claude connector, a remote MCP server at `/api/mcp`
+  (`app/api/mcp/route.ts`, `lib/agent-api.ts`). See `docs/CLAUDE_CONNECTOR.md`. (Grok was replaced by Claude.)
 - **Clients** (`/clients`): practices. Leads, jobs and leases link to a client. "Create from N leads" makes clients from DR lead companies.
 - Removed from v60: setters, call lists, free slots, statements, team tasks, setter portal, consulting, ENP pipeline, setter pay.
 
 ## Stack
 Next.js 15 (App Router) + TypeScript + Tailwind, Prisma + SQLite. Port 3100.
-New Prisma models: `Client`, `Lease`, `Concept`, `ConceptFit` (+ `clientId` and `category` on `Lead`, `clientId` on `Job`). Uploaded files live in `$DATA_DIR/files`. `prisma db push` on start adds them.
+New Prisma models: `Client`, `Lease`, `Concept`, `ConceptFit`, `Notice`, `NoticeReply` (+ `clientId` and `category` on `Lead`, `clientId` on `Job`). Uploaded files live in `$DATA_DIR/files`. `prisma db push` on start adds them.
 The `brand` column stays on leads/jobs (always "DR"); `lib/brand.ts` always returns DR. Setter/CallListItem tables are kept for the Directory.
 
 ## Roles (lib/access.ts)
@@ -31,7 +37,7 @@ ACCOUNTS: accounts, jobs, WIP, leases, clients. Concepts: ADMIN/CEO, BDM, PM, ES
 
 ## Setup
 1. `.env.example` → `.env` (never commit `.env`). Optional `MONTHLY_TARGET` (dashboard signed-work target, default 1000000).
-   For AI: `XAI_API_KEY` (and optionally `AI_MODEL`, `AI_VISION_MODEL`). For the outside Grok API: `GROK_ADMIN_KEY`.
+   For AI: `ANTHROPIC_API_KEY` (optionally `AI_MODEL`, `AI_VISION_MODEL`). For the Claude connector: `CLAUDE_CONNECTOR_KEY`.
    PDF floor plans need `pdftoppm` (poppler-utils; already in the Dockerfile).
 2. `npm install && npx prisma generate && npx prisma db push`
 3. `npx next dev -p 3100` → http://localhost:3100/login

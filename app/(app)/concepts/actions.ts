@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { audit } from "@/lib/automations";
 import { saveFile } from "@/lib/files";
+import { autoNotice } from "@/lib/notices";
 import { CONCEPT_FILE_KINDS, CONCEPT_STATUSES, parseFiles, roomsFromText } from "@/lib/concepts";
 
 const EDITORS = ["ADMIN", "BDM", "PM", "ESTIMATOR"] as const;
@@ -72,4 +73,22 @@ export async function deleteConcept(fd: FormData) {
   await audit(u.email, "delete", "Concept", id, c.name);
   revalidatePath("/concepts");
   redirect(`/concepts?msg=${enc(`Deleted ${c.name}.`)}`);
+}
+
+/** Upload a concept package PDF: Claude reads it into a new concept (room schedule, design moves, finishes, plan page). */
+export async function importPackage(fd: FormData) {
+  const u = await requireUser([...EDITORS]);
+  const f = fd.get("package");
+  if (!(f instanceof File) || !f.size) redirect(`/concepts?err=${enc("Choose the concept package PDF first.")}`);
+  const file = f as File;
+  if (!/\.pdf$/i.test(file.name)) redirect(`/concepts?err=${enc("The concept package must be a PDF.")}`);
+  let id = "";
+  try {
+    const { importConceptPackage } = await import("@/lib/concept-import");
+    const c = await importConceptPackage(Buffer.from(await file.arrayBuffer()), file.name, u.name);
+    id = c.id; await audit(u.email, "import package", "Concept", c.id, `${c.name} (${file.name})`);
+    await autoNotice("Update", `New concept in the library: ${c.name}${c.practiceType ? ` (${c.practiceType})` : ""}. Added by ${u.name}.`, `/concepts/${c.id}`, "Open concept");
+  } catch (e) { redirect(`/concepts?err=${enc(`Couldn't import ${file.name}: ${(e as Error).message}`)}`); }
+  revalidatePath("/concepts");
+  redirect(`/concepts/${id}?msg=${enc("Imported. Check the room schedule and size range, then it's ready to fit to tenancies.")}`);
 }
