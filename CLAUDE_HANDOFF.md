@@ -49,3 +49,9 @@ Hosting: `Dockerfile` + `scripts/start.sh` (DB on a volume at `$DATA_DIR/crm.db`
 ## Do not
 - Publish publicly, buy domains, or connect client systems without the admin's explicit OK
 - Put passwords/keys in chat or commit `.env`
+
+## Live deployment (since 18 Nov 2026)
+- Railway workspace "braiiii23's Projects" (Hobby), project **dr-fitout-crm**, service **crm**, region Singapore (asia-southeast1-eqsg3a), 1 replica.
+- Volume **crm-data** mounted at `/data` (database `crm.db` + uploaded files). Address: https://crm-production-785c7132.up.railway.app
+- Source: GitHub **Braiiii23/dr-fitout-crm** (private), branch `main`; every push deploys automatically.
+- Logins: set `ADMIN_PASSWORD` / `TEAM_PASSWORD` and a new `PASSWORD_RESET` value (e.g. a date) in Railway Variables to (re)set them on the next start.
