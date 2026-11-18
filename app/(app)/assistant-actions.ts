@@ -23,7 +23,7 @@ export async function askAssistant(history: Msg[], path: string): Promise<{ answ
   let data: string;
   try { data = await assistantContext(u, safePath); } catch (e) { data = `Data couldn't be loaded: ${(e as Error).message}`; }
   try {
-    const { text } = await aiChat({ feature: "assistant", system: `${SYSTEM}\n\nDATA:\n${data}`, messages: msgs, maxTokens: 900 });
+    const { text } = await aiChat({ feature: "assistant", system: `${SYSTEM}\n\nDATA:\n${data}`, messages: msgs, maxTokens: 3000, timeoutMs: 60000 });
     return text ? { answer: text } : { error: "No answer came back. Try rephrasing." };
   } catch (e) {
     return { error: `The AI didn't answer: ${(e as Error).message}. Try again in a minute.` };

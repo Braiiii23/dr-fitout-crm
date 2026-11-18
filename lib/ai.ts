@@ -29,7 +29,8 @@ export type AiPart = { type: "text"; text: string } | { type: "image"; dataUrl: 
 export type AiMsg = { role: "user" | "assistant"; content: string | AiPart[] };
 
 /** One call to Claude. Images go as base64 (PNG / JPEG / GIF / WebP). Returns the text reply. */
-export async function aiChat(o: { feature: AiFeature; system: string; messages: AiMsg[]; maxTokens?: number; temperature?: number; timeoutMs?: number; vision?: boolean; json?: boolean }): Promise<{ text: string; model: string }> {
+/** effort: how hard Claude thinks before answering (low = quick replies, medium = floor plans / packages, high = hardest jobs). */
+export async function aiChat(o: { feature: AiFeature; system: string; messages: AiMsg[]; maxTokens?: number; temperature?: number; timeoutMs?: number; vision?: boolean; json?: boolean; effort?: "low" | "medium" | "high" }): Promise<{ text: string; model: string }> {
   const c = aiConfig();
   if (!c) throw new Error("Claude isn't set up. Add ANTHROPIC_API_KEY on the server.");
   const model = o.vision ? c.visionModel : c.model;
@@ -45,15 +46,17 @@ export async function aiChat(o: { feature: AiFeature; system: string; messages: 
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": c.key, "anthropic-version": "2023-06-01" },
     // No temperature: current Claude models set it themselves (sending it is an error).
-    body: JSON.stringify({ model, system, max_tokens: o.maxTokens ?? 1024, messages: o.messages.map((m) => ({ role: m.role, content: content(m.content) })) }),
+    body: JSON.stringify({ model, system, max_tokens: o.maxTokens ?? 4000, output_config: { effort: o.effort ?? "low" }, messages: o.messages.map((m) => ({ role: m.role, content: content(m.content) })) }),
     signal: AbortSignal.timeout(o.timeoutMs ?? 45000),
   });
-  const body = (await res.json().catch(() => ({}))) as { content?: { type: string; text?: string }[]; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number } };
+  const body = (await res.json().catch(() => ({}))) as { content?: { type: string; text?: string }[]; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number }; stop_reason?: string };
+  if (process.env.AI_DEBUG) console.log("AI_DEBUG", o.feature, body.stop_reason, JSON.stringify(body.usage), JSON.stringify(body.content ?? body).slice(0, 1500));
   const secs = ((Date.now() - t0) / 1000).toFixed(1);
   if (!res.ok) {
     await audit("claude-ai", "ai error", o.feature, undefined, `${model} · ${res.status} · ${body.error?.message ?? ""}`.slice(0, 400)).catch(() => {});
     throw new Error(body.error?.message ?? `Claude returned an error (${res.status})`);
   }
+  if (body.stop_reason === "max_tokens" && !(body.content ?? []).some((b) => b.type === "text" && b.text)) throw new Error("Claude ran out of room before answering. Try again, or make the request smaller.");
   await audit("claude-ai", "ai call", o.feature, undefined, `${model} · ${secs}s · ${body.usage?.input_tokens ?? "?"} in / ${body.usage?.output_tokens ?? "?"} out tokens`).catch(() => {});
   return { text: (body.content ?? []).filter((b) => b.type === "text").map((b) => b.text ?? "").join("").trim(), model };
 }

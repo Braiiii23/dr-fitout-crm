@@ -84,7 +84,7 @@ export async function runConceptFit(leaseId: string, conceptId: string, brief: s
 
   let result: FitResult | null = null; let error: string | null = null; let model = "";
   try {
-    const r = await aiChat({ feature: "conceptFit", system: SYSTEM, messages: [{ role: "user", content: parts }], vision: true, json: true, maxTokens: 8000, timeoutMs: 180000 });
+    const r = await aiChat({ feature: "conceptFit", system: SYSTEM, messages: [{ role: "user", content: parts }], vision: true, json: true, effort: "medium", maxTokens: 32000, timeoutMs: 270000 });
     model = r.model;
     result = clean(jsonFrom<FitResult>(r.text));
   } catch (e) { error = (e as Error).message.slice(0, 500); }

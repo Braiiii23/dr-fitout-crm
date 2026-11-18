@@ -47,7 +47,7 @@ export async function importConceptPackage(pdf: Buffer, fileName: string, by: st
     const text = pageText.map((t, i) => `===== PAGE ${i + 1} =====\n${t.replace(/[ \t]{3,}/g, "  ")}`).join("\n").slice(0, 120000);
     const parts: AiPart[] = [{ type: "text", text: `Package file: ${fileName}\n\n${text}\n\nThe image is the concept floor plan (page ${planPage}).` }];
     if (plan) parts.push({ type: "image", dataUrl: `data:image/png;base64,${plan.toString("base64")}` });
-    const { text: reply } = await aiChat({ feature: "conceptImport", system: SYSTEM, messages: [{ role: "user", content: parts }], json: true, vision: true, maxTokens: 6000, timeoutMs: 180000 });
+    const { text: reply } = await aiChat({ feature: "conceptImport", system: SYSTEM, messages: [{ role: "user", content: parts }], json: true, vision: true, effort: "medium", maxTokens: 32000, timeoutMs: 270000 });
     const c = jsonFrom<{ name?: string; practiceType?: string; designedForSqm?: number | null; description?: string; finishes?: string; compliance?: string; tags?: string; rooms?: Room[] }>(reply);
 
     const files: StoredFile[] = [];

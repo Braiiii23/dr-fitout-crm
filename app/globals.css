@@ -1663,3 +1663,4 @@ main { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !importan
 .concept-rooms td { overflow-wrap:anywhere; white-space:normal; padding-left:.4rem; padding-right:.4rem; }
 .concept-rooms td:first-child { width:2.6rem; white-space:nowrap; }
 .concept-rooms td:last-child { width:4.6rem; white-space:nowrap; }
+.fit-entry { margin:.35rem .3rem 0; font-size:.75rem; color:#4b3a63; }

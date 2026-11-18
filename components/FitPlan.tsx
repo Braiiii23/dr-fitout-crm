@@ -33,8 +33,8 @@ export default function FitPlan({ r }: { r: FitResult }) {
         })}
         <text x={0} y={-0.45 * S} fontSize={13} className="fit-dim">{W.toFixed(1)} m</text>
         <text x={-0.45 * S} y={H * S} fontSize={13} className="fit-dim" transform={`rotate(-90 ${-0.45 * S} ${H * S})`}>{H.toFixed(1)} m</text>
-        {r.tenancy?.entry && <text x={W * S} y={(H + 0.8) * S} fontSize={12} textAnchor="end" className="fit-dim">Entry: {r.tenancy.entry}</text>}
       </svg>
+      {r.tenancy?.entry && <p className="fit-entry">Entry: {r.tenancy.entry}</p>}
       <figcaption className="fit-legend">{Object.entries(ZONE).map(([z, c]) => <span key={z}><i style={{ background: c }} />{z}</span>)}<span className="admin-muted">1 m grid · blank space = circulation</span></figcaption>
     </figure>
   );
