@@ -44,7 +44,8 @@ export async function aiChat(o: { feature: AiFeature; system: string; messages: 
   const res = await fetch(`${c.base}/v1/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": c.key, "anthropic-version": "2023-06-01" },
-    body: JSON.stringify({ model, system, max_tokens: o.maxTokens ?? 1024, temperature: o.temperature ?? 0.2, messages: o.messages.map((m) => ({ role: m.role, content: content(m.content) })) }),
+    // No temperature: current Claude models set it themselves (sending it is an error).
+    body: JSON.stringify({ model, system, max_tokens: o.maxTokens ?? 1024, messages: o.messages.map((m) => ({ role: m.role, content: content(m.content) })) }),
     signal: AbortSignal.timeout(o.timeoutMs ?? 45000),
   });
   const body = (await res.json().catch(() => ({}))) as { content?: { type: string; text?: string }[]; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number } };
