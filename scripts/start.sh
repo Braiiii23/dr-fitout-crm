@@ -15,6 +15,9 @@ else
   npx prisma db push --skip-generate
 fi
 
+# Logins: keep the team login on TEAM_EMAIL and create any missing staff logins (before passwords are set).
+node_modules/.bin/tsx scripts/ensure-users.ts
+
 # One-off password reset: set PASSWORD_RESET to any new value (e.g. 2026-11-06) and the three
 # logins are reset from ADMIN/SETTER/TEAM_PASSWORD on the next start. It runs once per value,
 # so passwords changed in the app afterwards are kept on later restarts.
@@ -34,7 +37,6 @@ if [ "$WIP_SEED_EXAMPLE" = "1" ] && [ ! -f "$DATA_DIR/.wip-seeded" ]; then
   node_modules/.bin/tsx scripts/seed-wip-example.ts && touch "$DATA_DIR/.wip-seeded"
 fi
 
-node_modules/.bin/tsx scripts/ensure-users.ts
 node_modules/.bin/tsx scripts/migrate-lease-stages.ts
 node_modules/.bin/tsx scripts/seed-concepts.ts
 
