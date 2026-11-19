@@ -638,6 +638,8 @@ model Lease {
   rentFreeMonths   Float?
   permittedUse     String?
   files            String?                   // JSON [{id, name, kind: "floor plan"|"lease"|"other", added}]
+  conceptId        String?                   // the concept we're proposing for this tenancy
+  concept          Concept? @relation(fields: [conceptId], references: [id], onDelete: SetNull)
   fits             ConceptFit[]
   makeGood         String?
   notes            String?
@@ -662,6 +664,7 @@ model Concept {
   files        String?                   // JSON [{id, name, kind: "image"|"plan"|"other", added}]
   createdBy    String?
   fits         ConceptFit[]
+  leases       Lease[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   @@index([practiceType])

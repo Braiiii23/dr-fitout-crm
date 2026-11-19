@@ -127,12 +127,12 @@ export async function assistantContext(u: CurrentUser, path: string) {
 
 /** Leases and clients: status, money and the next key date for each open lease. */
 async function leasesContext() {
-  const leases = await prisma.lease.findMany({ include: { client: { select: { name: true } } }, orderBy: { updatedAt: "desc" }, take: 80 });
+  const leases = await prisma.lease.findMany({ include: { client: { select: { name: true } }, concept: { select: { name: true } } }, orderBy: { updatedAt: "desc" }, take: 80 });
   const clients = await prisma.client.findMany({ select: { name: true, type: true, status: true, _count: { select: { leads: true, jobs: true, leases: true } } }, orderBy: { name: "asc" }, take: 120 });
   const today = brisbaneToday();
   const L = leases.map((l) => {
     const next = keyDates(l, today).find((d) => d.days >= 0);
-    return `- ${[l.tenancy, l.premises, l.suburb].filter(Boolean).join(", ")} | ${l.status} | client ${l.client?.name ?? "—"} | ${l.sizeSqm ?? "?"} sqm | rent ${l.rentPa ?? "?"}/yr, outgoings ${l.outgoingsPa ?? "?"}/yr | incentive ${l.incentive ?? 0} | expiry ${expiryOf(l) ?? "?"}${next ? ` | next: ${next.label} ${next.date}` : ""}`;
+    return `- ${[l.tenancy, l.premises, l.suburb].filter(Boolean).join(", ")} | ${l.status} | client ${l.client?.name ?? "—"} | concept ${l.concept?.name ?? "—"} | ${l.sizeSqm ?? "?"} sqm | rent ${l.rentPa ?? "?"}/yr, outgoings ${l.outgoingsPa ?? "?"}/yr | incentive ${l.incentive ?? 0} | expiry ${expiryOf(l) ?? "?"}${next ? ` | next: ${next.label} ${next.date}` : ""}`;
   });
   const concepts = await prisma.concept.findMany({ where: { status: { not: "Archived" } }, select: { name: true, practiceType: true, minSqm: true, maxSqm: true, rooms: true, tags: true }, orderBy: { name: "asc" } });
   const K = concepts.map((c) => { let n = 0; try { n = (JSON.parse(c.rooms ?? "[]") as { qty?: number }[]).reduce((a, r) => a + (r.qty ?? 1), 0); } catch {} return `- ${c.name} (${c.practiceType ?? "?"}, suits ${c.minSqm ?? "?"}–${c.maxSqm ?? "?"} m², ${n} rooms)${c.tags ? ` · ${c.tags}` : ""}`; });

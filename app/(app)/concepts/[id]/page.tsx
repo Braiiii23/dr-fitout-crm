@@ -15,7 +15,7 @@ export default async function ConceptPage({ params, searchParams }: { params: Pr
   const u = await requireUser(["ADMIN", "BDM", "PM", "ESTIMATOR", "ACCOUNTS", "FOREMAN"]);
   const canEdit = EDITORS.includes(u.role);
   const { id } = await params; const sp = await searchParams;
-  const c = await prisma.concept.findUnique({ where: { id }, include: { fits: { orderBy: { createdAt: "desc" }, take: 20, include: { lease: { select: { id: true, premises: true, tenancy: true } } } } } });
+  const c = await prisma.concept.findUnique({ where: { id }, include: { fits: { orderBy: { createdAt: "desc" }, take: 20, include: { lease: { select: { id: true, premises: true, tenancy: true } } } }, leases: { orderBy: { updatedAt: "desc" }, select: { id: true, premises: true, tenancy: true, status: true, client: { select: { name: true } } } } } });
   if (!c) notFound();
   const files = parseFiles(c.files); const rooms = parseRooms(c.rooms);
   const isImg = (f: { name: string; type?: string }) => (f.type ?? "").startsWith("image/") || /\.(png|jpe?g|webp)$/i.test(f.name);
@@ -44,6 +44,12 @@ export default async function ConceptPage({ params, searchParams }: { params: Pr
             <h2 className="lease-h2">Room schedule</h2>
             {rooms.length ? <table className="table concept-rooms"><tbody>{rooms.map((r, i) => <tr key={i}><td>{r.qty} ×</td><td>{r.name}{r.notes && <div className="text-xs admin-muted">{r.notes}</div>}</td><td className="text-right">{r.areaSqm ? `${r.areaSqm} m²` : ""}</td></tr>)}</tbody></table> : <p className="admin-muted">No rooms listed yet.</p>}
             {rooms.length > 0 && <p className="mt-2 font-semibold">{Math.round(roomsTotal(rooms))} m² of rooms <span className="admin-muted font-normal">(+ circulation, usually 20–30%)</span></p>}
+          </div>
+          <div className="card text-sm">
+            <h2 className="lease-h2">Linked leases ({c.leases.length})</h2>
+            {c.leases.length ? <ul className="space-y-1">{c.leases.map((l) => (
+              <li key={l.id}><Link prefetch={false} className="brand-text underline" href={`/leases/${l.id}`}>{[l.tenancy, l.premises].filter(Boolean).join(", ")}</Link> <span className="admin-muted">· {l.status}{l.client ? ` · ${l.client.name}` : ""}</span></li>))}</ul>
+              : <p className="admin-muted">No leases linked yet. Link one from a lease page.</p>}
           </div>
           <div className="card text-sm">
             <h2 className="lease-h2">Fitted to tenancies</h2>

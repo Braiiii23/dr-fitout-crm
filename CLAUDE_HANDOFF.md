@@ -12,7 +12,7 @@ My Day · Calendar · Dashboard · Leads · Jobs · WIP · Estimating · Account
   option-notice / review / expiry dates, rent, outgoings, incentive, files (floor plan, lease, other). Clients link from the board, list,
   lease page ("…or add a new client" creates one) and the client page. Key dates show on Leases, Dashboard, team Calendar and the assistant.
   Old stage names from v1 are moved onto the new stages on start (`scripts/migrate-lease-stages.ts`).
-- **Concepts** (`/concepts`): our concept library: room schedule (one per line, e.g. `6 x Consult room 12 sqm`), design intent, finishes, images/plans.
+- **Concepts** (`/concepts`): our concept library (each lease can link one concept: lease page → Concept box, or star an AI fit): room schedule (one per line, e.g. `6 x Consult room 12 sqm`), design intent, finishes, images/plans.
 - **Concept packages**: "Import a concept package" (Concepts page) — Claude reads an A3 package PDF (narrative, key design moves, room schedule,
   finishes, compliance) into a concept and keeps the cover, the concept floor plan page (kind "plan"), a render and the PDF. `lib/concept-import.ts`.
   The GP, Allied Health and Kids Psychology packages ship in `seed/concepts/` and load on first start (`scripts/seed-concepts.ts`).

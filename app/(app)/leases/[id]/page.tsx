@@ -9,7 +9,7 @@ import ConfirmButton from "@/components/ConfirmButton";
 import LeaseForm from "@/components/LeaseForm";
 import { leaseOptions } from "@/lib/lease-options";
 import { LEASE_STATUS_COLOURS, expiryOf, inDays, keyDates, perSqm, stageOf, urgency } from "@/lib/leases";
-import { chooseFit, deleteLease, removeLeaseFile, runFit, setLeaseClient, setLeaseFileKind, updateLease, uploadLeaseFiles } from "../actions";
+import { chooseFit, deleteLease, removeLeaseFile, runFit, setLeaseClient, setLeaseConcept, setLeaseFileKind, updateLease, uploadLeaseFiles } from "../actions";
 import { AutoSubmitSelect } from "@/components/AutoSubmit";
 import PendingButton from "@/components/PendingButton";
 import FitPlan from "@/components/FitPlan";
@@ -23,7 +23,7 @@ export default async function LeasePage({ params, searchParams }: { params: Prom
   const u = await requireViewer(["ADMIN", "BDM", "PM", "ACCOUNTS"]);
   const canEdit = EDITORS.includes(u.role);
   const { id } = await params; const sp = await searchParams;
-  const lease = await prisma.lease.findUnique({ where: { id }, include: { client: true, lead: { select: { id: true, leadName: true, company: true, stage: true } } } });
+  const lease = await prisma.lease.findUnique({ where: { id }, include: { client: true, concept: { select: { id: true, name: true, practiceType: true } }, lead: { select: { id: true, leadName: true, company: true, stage: true } } } });
   if (!lease) notFound();
   lease.status = stageOf(lease.status);
   const { clients, leads } = await leaseOptions();
@@ -62,7 +62,7 @@ export default async function LeasePage({ params, searchParams }: { params: Prom
           : (
             <form action={runFit} className="concept-run">
               <input type="hidden" name="id" value={lease.id} />
-              <label><span className="label">Concept</span><select name="conceptId" className="input" required defaultValue="">
+              <label><span className="label">Concept</span><select name="conceptId" className="input" required defaultValue={lease.conceptId ?? ""}>
                 <option value="" disabled>Choose a concept…</option>
                 {conceptOpts.map((c) => { const r = parseRooms(c.rooms); return <option key={c.id} value={c.id}>{c.name}{c.practiceType ? ` · ${c.practiceType}` : ""}{c.minSqm || c.maxSqm ? ` · ${c.minSqm ?? "?"}–${c.maxSqm ?? "?"} m²` : ""}{r.length ? ` · ${Math.round(roomsTotal(r))} m² rooms` : ""}{suits(c) ? "" : " (size outside its range)"}</option>; })}
               </select></label>
@@ -142,6 +142,18 @@ export default async function LeasePage({ params, searchParams }: { params: Prom
             {row("Gross $/sqm", ps ? fmtAUD(Math.round(ps)) : "")}{row("Reviews", lease.reviewType)}
             {row("Fitout incentive", fmtAUD(lease.incentive))}{row("Rent-free", lease.rentFreeMonths ? `${lease.rentFreeMonths} months` : "")}
             {!gross && !lease.incentive && <p className="admin-muted">Add rent and outgoings to see the occupancy cost.</p>}
+          </div>
+          <div className="card text-sm">
+            <h2 className="lease-h2">Concept</h2>
+            {lease.concept ? <p><Link prefetch={false} className="brand-text underline" href={`/concepts/${lease.concept.id}`}>{lease.concept.name}</Link>{lease.concept.practiceType && <span className="admin-muted"> · {lease.concept.practiceType}</span>}</p> : <p className="admin-muted">No concept linked yet.</p>}
+            {canEdit && (
+              <form action={setLeaseConcept} className="mt-2 space-y-2">
+                <input type="hidden" name="id" value={lease.id} /><input type="hidden" name="_back" value={`/leases/${lease.id}`} />
+                <select name="conceptId" className="input" defaultValue={lease.conceptId ?? ""} aria-label="Concept"><option value="">— no concept —</option>{concepts.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+                <button className="btn-ghost w-full justify-center">{lease.conceptId ? "Change concept" : "Link concept"}</button>
+              </form>
+            )}
+            <p className="mt-2 text-xs admin-muted">Starring an AI fit (★ Use this one) links its concept too.</p>
           </div>
           <div className="card text-sm">
             <h2 className="lease-h2">Linked</h2>
