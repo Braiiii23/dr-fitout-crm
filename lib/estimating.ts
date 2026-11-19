@@ -23,10 +23,11 @@ export const TRADES = [
   "Demolition", "Carpentry", "Joinery", "Plasterboard & ceilings", "Electrical", "Plumbing", "Mechanical / HVAC",
   "Fire services", "Flooring", "Painting", "Glazing", "Data & comms", "Signage", "Cleaning", "Other",
 ];
-export const TRADE_STATUSES = ["Requested", "Received", "Accepted", "Declined"] as const;
+export const TRADE_STATUSES = ["Requested", "Received", "Accepted", "Declined", "AI estimate"] as const;
+export const AI_EST = "AI estimate";
 
 type TQ = { trade: string; price: number | null; status: string };
-/** Per trade: the quote that counts (Accepted, otherwise the cheapest Received). Total = sum of those. */
+/** Per trade: the quote that counts (Accepted, otherwise the cheapest Received, otherwise Claude's AI estimate). Total = sum of those. */
 export function summariseTrades<T extends TQ>(quotes: T[]) {
   const byTrade = new Map<string, T[]>();
   for (const q of quotes) byTrade.set(q.trade, [...(byTrade.get(q.trade) ?? []), q]);
@@ -34,8 +35,9 @@ export function summariseTrades<T extends TQ>(quotes: T[]) {
     const priced = qs.filter((q) => q.price != null && (q.status === "Received" || q.status === "Accepted"));
     const accepted = qs.find((q) => q.status === "Accepted" && q.price != null) ?? null;
     const cheapest = priced.length ? priced.reduce((a, b) => ((a.price ?? 0) <= (b.price ?? 0) ? a : b)) : null;
-    const counts = accepted ?? cheapest;
-    return { trade, quotes: qs, counts, basis: accepted ? "Accepted" : cheapest ? "Lowest received" : "Waiting", waiting: qs.filter((q) => q.status === "Requested").length };
+    const ai = qs.find((q) => q.status === AI_EST && q.price != null) ?? null;
+    const counts = accepted ?? cheapest ?? ai;
+    return { trade, quotes: qs, counts, basis: accepted ? "Accepted" : cheapest ? "Lowest received" : ai ? AI_EST : "Waiting", waiting: qs.filter((q) => q.status === "Requested").length };
   }).sort((a, b) => a.trade.localeCompare(b.trade));
   const total = rows.reduce((n, r) => n + (r.counts?.price ?? 0), 0);
   return {
@@ -43,6 +45,7 @@ export function summariseTrades<T extends TQ>(quotes: T[]) {
     received: quotes.filter((q) => q.status === "Received" || q.status === "Accepted").length,
     requested: quotes.filter((q) => q.status === "Requested").length,
     tradesCovered: rows.filter((r) => r.counts).length,
+    aiEstimated: rows.filter((r) => r.basis === AI_EST).length,
   };
 }
 

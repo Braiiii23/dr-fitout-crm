@@ -15,11 +15,15 @@ import { jobEstimate } from "@/lib/job-estimate";
 import QuoteJobFields from "@/components/QuoteJobFields";
 import { updateQuoteDetails } from "../actions";
 import { getUser } from "@/lib/auth";
+import AiEstimatePanel from "@/components/AiEstimatePanel";
+import { parseFiles } from "@/lib/concepts";
+import type { AiEstimate } from "@/lib/estimate-ai";
 
 // Trade pack for one job: every trade quote with scope and price, plus a compiled summary
 // (accepted quote per trade, otherwise the cheapest received) that can be printed or saved as PDF.
 export default async function TradePack({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Record<string, string>> }) {
-  const added = (await searchParams).added === "1";
+  const sp = await searchParams;
+  const added = sp.added === "1";
   await requireViewer(["ADMIN", "ESTIMATOR", "ACCOUNTS", "BDM", "PM"]);
   const { id } = await params;
   const viewer = await getUser();
@@ -28,7 +32,8 @@ export default async function TradePack({ params, searchParams }: { params: Prom
     select: {
       id: true, brand: true, leadName: true, company: true, location: true, projectType: true, sizeSqm: true, notes: true, quoteValue: true,
       phone: true, email: true, budget: true, timeframe: true, lookingFor: true, sourceLink: true,
-      estOtherCosts: true, estContingencyPct: true,
+      estOtherCosts: true, estContingencyPct: true, estFiles: true, estBrief: true, aiEstimate: true, aiEstimateAt: true,
+      leases: { select: { concepts: { select: { id: true } } } },
       estPlansAt: true, estScopeAt: true, estExcelAt: true, estRfqAt: true, estPrelimAt: true, estRfqRecAt: true, estProposalAt: true, estSentAt: true,
       tradeQuotes: { orderBy: [{ trade: "asc" }, { price: "asc" }] },
       scopeItems: { orderBy: [{ trade: "asc" }, { sortOrder: "asc" }] },
@@ -39,7 +44,11 @@ export default async function TradePack({ params, searchParams }: { params: Prom
   const sum = summariseTrades(job.tradeQuotes);
   const scope = scopeCoverage(job.scopeItems, job.tradeQuotes);
   const est = jobEstimate(job);
-  const goal = (await prisma.accountsSettings.findUnique({ where: { id: "settings" } }))?.grossMarginGoal ?? 25;
+  const settings = await prisma.accountsSettings.findUnique({ where: { id: "settings" } });
+  const goal = settings?.grossMarginGoal ?? 25;
+  const concepts = await prisma.concept.findMany({ where: { status: { not: "Archived" } }, orderBy: { name: "asc" }, select: { id: true, name: true } });
+  let aiEst: AiEstimate | null = null; try { aiEst = job.aiEstimate ? JSON.parse(job.aiEstimate) : null; } catch { aiEst = null; }
+  const canEditEst = !!viewer && ["ADMIN", "ESTIMATOR", "ACCOUNTS"].includes(viewer.role);
   const scopeTrades = [...new Set(scope.rows.map((r) => r.item.trade))];
   const pct = estPercent(job); const nx = nextStep(job);
   const title = job.company || job.leadName || "Job";
@@ -60,6 +69,8 @@ export default async function TradePack({ params, searchParams }: { params: Prom
         </div>
       </header>
 
+      {sp.msg && <div className="acc-notice no-print" role="status">{sp.msg}</div>}
+      {sp.err && <div className="aw-err no-print" role="alert" style={{ color: "#fca5a5" }}>{sp.err}</div>}
       {added && <div className="acc-notice" role="status">Added to the estimating board. Fill in the trade quotes and scope below.</div>}
       {(viewer?.role === "ESTIMATOR" || viewer?.role === "ADMIN") && (
         <details className="card acc-pad no-print est-editjob">
@@ -73,6 +84,11 @@ export default async function TradePack({ params, searchParams }: { params: Prom
         </details>
       )}
 
+
+      <AiEstimatePanel id={job.id} canEdit={canEditEst} isAdminOrEstimator={!!viewer && ["ADMIN", "ESTIMATOR"].includes(viewer.role)}
+        files={parseFiles(job.estFiles)} brief={job.estBrief} est={aiEst} estAt={job.aiEstimateAt}
+        concepts={concepts} defaultConceptId={aiEst ? concepts.find((c) => c.name === aiEst!.conceptName)?.id ?? null : job.leases.flatMap((l) => l.concepts.map((c) => c.id))[0] ?? null}
+        rateNotes={settings?.estRateNotes ?? null} quoteValue={job.quoteValue} />
 
       {/* Master scope of works */}
       <section className="card tp-scope-card">
@@ -159,7 +175,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
                     <td>{r.counts?.company ?? "—"}</td>
                     <td className="tp-scope">{r.counts?.scope ?? "—"}</td>
                     <td className="tp-price">{r.counts?.price != null ? fmtAUD(r.counts.price) : "—"}</td>
-                    <td><span className={`tp-basis tp-basis-${r.basis === "Accepted" ? "acc" : r.basis === "Waiting" ? "wait" : "low"}`}>{r.basis}{r.waiting ? ` · ${r.waiting} waiting` : ""}</span></td>
+                    <td><span className={`tp-basis tp-basis-${r.basis === "Accepted" ? "acc" : r.basis === "Waiting" ? "wait" : r.basis === "AI estimate" ? "ai" : "low"}`}>{r.basis}{r.waiting ? ` · ${r.waiting} waiting` : ""}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -167,7 +183,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
             </table>
           </div>
         )}
-        <p className="tp-foot">Each trade counts its <b>Accepted</b> quote, or the lowest received price if none is accepted yet. Prices ex GST.</p>
+        <p className="tp-foot">Each trade counts its <b>Accepted</b> quote, or the lowest received price if none is accepted yet, or Claude&apos;s <b>AI estimate</b> until a real quote comes in. Prices ex GST.</p>
       </section>
 
       {/* Job cost and gross profit estimate */}
@@ -189,6 +205,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
             <tr><td><b>Gross profit</b></td><td className="tp-price">{est.sell ? `${fmtAUD(Math.round(est.gp))} · ${est.gpPct.toFixed(1)}%` : "—"}</td></tr>
           </tbody>
         </table>
+        {est.aiEstimated > 0 && <p className="tp-foot" style={{ color: "#c4b5fd" }}>{est.aiEstimated} trade{est.aiEstimated === 1 ? " is" : "s are"} priced from the AI estimate, not a real quote yet.</p>}
         {(est.notQuoted > 0 || est.tradesWaiting > 0) && <p className="tp-foot" style={{ color: "#fbbf24" }}>Not final yet: {est.notQuoted ? `${est.notQuoted} scope item${est.notQuoted === 1 ? "" : "s"} not quoted` : ""}{est.notQuoted && est.tradesWaiting ? " and " : ""}{est.tradesWaiting ? `${est.tradesWaiting} trade quote${est.tradesWaiting === 1 ? "" : "s"} still waiting` : ""}. The cost will rise as these come in.</p>}
         <form action={saveJobEstimate} className="tp-form no-print">
           <input type="hidden" name="id" value={job.id} />

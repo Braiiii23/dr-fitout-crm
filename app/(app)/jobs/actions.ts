@@ -210,7 +210,7 @@ export async function pullTradePack(fd: FormData) {
   let sort = job.costLines.length, added = 0;
   for (const r of summariseTrades(lead.tradeQuotes).rows) {
     if (have.has(r.trade.toLowerCase())) continue;
-    await prisma.jobCostLine.create({ data: { jobId, trade: r.trade, supplier: r.counts?.company ?? null, cost: r.counts?.price ?? 0, costStatus: r.counts ? "Quoted" : "Provisional", sort: sort++, source: "estimating" } });
+    await prisma.jobCostLine.create({ data: { jobId, trade: r.trade, supplier: r.counts?.company ?? null, cost: r.counts?.price ?? 0, costStatus: r.counts && r.basis !== "AI estimate" ? "Quoted" : "Provisional", sort: sort++, source: "estimating" } });
     added++;
   }
   if (lead.estOtherCosts && !have.has("other costs (materials, labour, site)")) { await prisma.jobCostLine.create({ data: { jobId, trade: "Other costs (materials, labour, site)", cost: lead.estOtherCosts, costStatus: "Provisional", sort: sort++, source: "estimating" } }); added++; }

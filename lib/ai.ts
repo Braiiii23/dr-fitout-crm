@@ -10,12 +10,13 @@
 import "server-only";
 import { audit } from "./automations";
 
-export type AiFeature = "assistant" | "dashboard" | "conceptFit" | "conceptImport";
+export type AiFeature = "assistant" | "dashboard" | "conceptFit" | "conceptImport" | "estimate";
 export const AI_FEATURES: Record<AiFeature, string> = {
   assistant: "Ask assistant (every page)",
   dashboard: "Dashboard assistant (updates leads)",
   conceptFit: "AI concept fit (recreates a concept on a tenancy floor plan)",
   conceptImport: "Concept package import (reads package PDFs)",
+  estimate: "AI estimate (prices a job from plans, photos, concept and past jobs)",
 };
 
 export function aiConfig(): { key: string; model: string; visionModel: string; base: string } | null {

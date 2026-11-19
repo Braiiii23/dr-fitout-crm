@@ -113,6 +113,10 @@ model Lead {
   estFinalDue          String?   // final quote due to the client, YYYY-MM-DD
   estOtherCosts        Float?    // estimator: materials, own labour, site costs, prelims (ex GST), on top of trade quotes
   estContingencyPct    Float?    // estimator: contingency % on trade + other costs
+  estFiles             String?   // JSON [{id, name, kind: plans|photo|other, added, type}] for the AI estimate
+  estBrief             String?   // what the client wants, for the AI estimate
+  aiEstimate           String?   // JSON: Claude's latest estimate (see lib/estimate-ai.ts)
+  aiEstimateAt         DateTime?
   xeroContact          String?   // the client's contact name in Xero, when it isn't matched automatically
   clientId             String?
   client               Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
@@ -280,6 +284,7 @@ model XeroSnapshot {
 model AccountsSettings {
   id                  String  @id @default("settings")
   monthlyTarget       Float   @default(1000000)
+  estRateNotes        String? // house rates and rules Claude uses for every AI estimate
   grossMarginGoal     Float   @default(25)
   netMarginGoal       Float   @default(9)
   bufferAmount        Float   @default(45000)

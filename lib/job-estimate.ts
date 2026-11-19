@@ -21,7 +21,7 @@ export function jobEstimate(l: EstInput, sellOverride?: number | null) {
   const gp = sell - cost;
   const scope = l.scopeItems ? scopeCoverage(l.scopeItems, l.tradeQuotes) : null;
   return {
-    tradeTotal: trades.total, tradesPriced: trades.tradesCovered, tradesWaiting: trades.requested, other, contPct, contingency, cost, sell, gp,
+    tradeTotal: trades.total, tradesPriced: trades.tradesCovered, aiEstimated: trades.aiEstimated, tradesWaiting: trades.requested, other, contPct, contingency, cost, sell, gp,
     gpPct: sell > 0 ? gp / sell * 100 : 0,
     hasEstimate: base > 0,
     notQuoted: scope?.missing ?? 0, waitingScope: scope?.waiting ?? 0,

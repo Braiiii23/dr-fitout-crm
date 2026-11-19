@@ -59,7 +59,7 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
 };
 // Fields that only the app itself manages.
 const LOCKED: Record<string, string[]> = {
-  CallListItem: ["slotId", "setterId", "business"], Lead: ["brand", "setterId"], Job: ["brand"],
+  CallListItem: ["slotId", "setterId", "business"], Lead: ["brand", "setterId", "estFiles", "aiEstimate", "aiEstimateAt"], Job: ["brand"],
   Lease: ["files", "conceptId"], Concept: ["files"], ConceptFit: ["result"],
   Notice: ["authorId", "authorName", "auto"], NoticeReply: ["authorId", "authorName"],
 };
