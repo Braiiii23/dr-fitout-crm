@@ -2,7 +2,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySession } from "./lib/session";
 import { canOpen, homeFor, type AnyRole } from "./lib/access";
 
-const BRAIDEN_EMAIL = "braiden@enpfitouts.com.au";
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -20,10 +19,8 @@ export async function middleware(req: NextRequest) {
   const s = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
   if (!s) return NextResponse.redirect(new URL("/login", req.url));
 
-  const email = (s.email || "").trim().toLowerCase();
-  // CEO = full admin. Any other ADMIN flag (not Braiden) is treated as the team login.
-  const isBraidenAdmin = (s.role === "ADMIN" && email === BRAIDEN_EMAIL) || s.role === "CEO";
-  const effectiveRole = (s.role === "ADMIN" && email !== BRAIDEN_EMAIL ? "TEAM" : s.role === "CEO" ? "ADMIN" : s.role) as AnyRole;
+  // CEO = full admin; every other role as stored (any Admin login is a full admin).
+  const effectiveRole = (s.role === "CEO" ? "ADMIN" : s.role) as AnyRole;
 
   const under = (p: string) => pathname === p || pathname.startsWith(p + "/");
   // My Day and the team calendar are for everyone (each person only ever edits their own).

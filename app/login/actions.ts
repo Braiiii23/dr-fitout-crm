@@ -25,7 +25,7 @@ export async function login(_: unknown, fd: FormData) {
     const count = (f && f.until <= now && f.until !== 0 ? 0 : f?.count ?? 0) + 1;
     fails.set(email, { count, until: count >= MAX_FAILS ? now + LOCK_MS : 0 });
     await new Promise((r) => setTimeout(r, 400));
-    return { error: "Email or password is incorrect." };
+    return { error: "Username or password is incorrect." };
   }
   fails.delete(email);
   const token = await signSession({ uid: u.id, email: u.email, name: u.name, role: u.role as "ADMIN" | "TEAM" | "SETTER" | "ESTIMATOR" | "ACCOUNTS", setterId: u.setterId });

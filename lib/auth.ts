@@ -8,17 +8,16 @@ import { homeFor as accessHome, type AnyRole } from "./access";
 export type Role = SessionPayload["role"];
 export type CurrentUser = { id: string; email: string; name: string; role: Role; setterId: string | null; isCeo?: boolean };
 
-/** Only Braiden has full CRM control and dashboards. */
+/** The original owner login (used as a default owner for imported tasks and availability). */
 export const BRAIDEN_EMAIL = "braiden@enpfitouts.com.au";
 
-/** Braiden, or a CEO login: full control (users, settings, connections). */
-export function isBraiden(u: { email: string; isCeo?: boolean }) {
-  return !!u.isCeo || u.email.trim().toLowerCase() === BRAIDEN_EMAIL;
+/** Full control (users, settings, connections): any Admin or CEO login. */
+export function isBraiden(u: { role?: string; email: string; isCeo?: boolean }) {
+  return !!u.isCeo || u.role === "ADMIN" || u.role === "CEO";
 }
 
-/** Effective role: ADMIN only if the account is Braiden. Other ADMIN flags are treated as TEAM. */
+/** Effective role: CEO works as Admin; everything else as stored. */
 export function effectiveRole(u: { email: string; role: Role }): Role {
-  if (u.role === "ADMIN" && !isBraiden(u)) return "TEAM";
   return u.role;
 }
 
@@ -44,4 +43,4 @@ export function homeFor(role: Role) {
   return accessHome(role as AnyRole);
 }
 
-export const isAdmin = (u: CurrentUser) => u.role === "ADMIN" && isBraiden(u);
+export const isAdmin = (u: CurrentUser) => u.role === "ADMIN";

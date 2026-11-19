@@ -7,9 +7,10 @@ import { ROLE_LABEL, ROLE_ABOUT } from "@/lib/access";
 import { getTeamView } from "@/lib/team-view";
 
 const STAFF_ROLES = ["CEO", "BDM", "PM", "FOREMAN", "ESTIMATOR", "ACCOUNTS", "TEAM"] as const;
+const ALL_ROLES = ["ADMIN", ...STAFF_ROLES] as const;
 
 export default async function Users({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
-  await requireUser(["ADMIN"]);
+  const me = await requireUser(["ADMIN"]);
   const sp = await searchParams;
   const tv = await getTeamView();
   const claude = aiConfig();
@@ -19,21 +20,21 @@ export default async function Users({ searchParams }: { searchParams: Promise<Re
     <form action={saveUser} className="grid items-end gap-2 border-t p-3 first:border-0 md:grid-cols-[1.2fr_1.5fr_1fr_1fr_auto_auto]">
       <input type="hidden" name="id" value={u?.id ?? ""} />
       <div><label className="label">Name</label><input name="name" defaultValue={u?.name} className="input" required /></div>
-      <div><label className="label">Email</label><input name="email" type="email" defaultValue={u?.email} className="input" required /></div>
-      <div><label className="label">Role</label>{u?.email?.toLowerCase() === "braiden@enpfitouts.com.au" ? (<><input type="hidden" name="role" value="ADMIN" /><div className="input bg-slate-50">Admin</div></>) : (<select name="role" defaultValue={u?.role === "ADMIN" ? "TEAM" : (u?.role ?? "TEAM")} className="input">{STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select>)}</div>
-      <div><label className="label">{u ? "New password" : "Password"}</label><input name="password" type="password" minLength={u ? 0 : 10} placeholder={u ? "leave blank to keep" : "min 10 chars"} className="input" autoComplete="new-password" /></div>
+      <div><label className="label">Username or email{u?.id === me.id ? " (you)" : ""}</label><input name="email" type="text" defaultValue={u?.email} className="input" required autoCapitalize="none" autoCorrect="off" spellCheck={false} placeholder="e.g. phi or phi@drfitout.com.au" /></div>
+      <div><label className="label">Role</label><select name="role" defaultValue={u?.role ?? "TEAM"} className="input">{ALL_ROLES.map((r) => <option key={r} value={r}>{ROLE_LABEL[r]}</option>)}</select></div>
+      <div><label className="label">{u ? "New password" : "Password"}</label><input name="password" type="text" minLength={u ? 0 : 8} placeholder={u ? "leave blank to keep" : "min 8 characters"} className="input" autoComplete="off" autoCapitalize="none" spellCheck={false} /></div>
       <label className="flex items-center gap-1 pb-2 text-sm">{u ? <><input type="checkbox" name="active" defaultChecked={u.active} /> Active</> : null}</label>
       <button className="btn">{u ? "Save" : "Add user"}</button>
     </form>
   );
   return (
     <div>
-      <PageTitle title="Users & access" sub="Admin only: logins and what each person can open. Team: Directory plus view-only access to the other pages." />
+      <PageTitle title="Users & access" sub="Add people, set their username (or email) and password, and choose what they can open. Any Admin can manage users. Type a new password to reset someone's; tell them it in person." />
       <Flash msg={sp.msg} /><Flash msg={sp.err} kind="err" />
       <div className="card p-0">{users.map((u) => <Row key={u.id} u={u} />)}</div>
       <h2 className="mb-2 mt-6 font-semibold brand-text">What each role can do</h2>
       <div className="card text-sm roles-guide">
-        {STAFF_ROLES.map((r) => <p key={r}><b>{ROLE_LABEL[r]}:</b> {ROLE_ABOUT[r]} Everyone also gets My Day and the team calendar.</p>)}
+        {ALL_ROLES.map((r) => <p key={r}><b>{ROLE_LABEL[r]}:</b> {ROLE_ABOUT[r]} Everyone also gets My Day and the team calendar.</p>)}
       </div>
       <h2 id="ai" className="mb-2 mt-6 font-semibold brand-text">AI: Claude inside, Grok outside</h2>
       <div className="card space-y-3 text-sm">

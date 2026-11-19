@@ -10,7 +10,7 @@ export const ROLE_LABEL: Record<AnyRole, string> = {
   ESTIMATOR: "Estimating", ACCOUNTS: "Accounts", SETTER: "Setter (legacy)", TEAM: "Team (shared login)",
 };
 export const ROLE_ABOUT: Record<AnyRole, string> = {
-  ADMIN: "Everything.",
+  ADMIN: "Everything, including adding users, setting passwords and the AI / Xero settings.",
   CEO: "Everything, including users, settings, Xero and BuilderTrend.",
   BDM: "Dashboard, leads, leases, clients and the Directory. Estimating view only. No accounts or job money.",
   PM: "Jobs and WIP: program, dates, trades, costs, labour, materials and bills (claims view only), BuilderTrend, leases, clients and the Directory. Can view the rest of the CRM.",

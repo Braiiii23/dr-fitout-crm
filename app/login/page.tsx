@@ -22,7 +22,7 @@ export default function LoginPage() {
           </div>
           <p className="login-eyebrow login-eyebrow-card">DR Fitout CRM · Private</p>
           <h1 className="login-title">Sign in</h1>
-          <p className="login-sub">Staff only. Use your work email.</p>
+          <p className="login-sub">Staff only. Use the username or email your admin gave you.</p>
           <LoginForm />
           <p className="login-foot">DR Fitout</p>
         </section>
