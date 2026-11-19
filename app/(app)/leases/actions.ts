@@ -150,7 +150,7 @@ export async function chooseFit(fd: FormData) {
   const id = String(fd.get("id")); const fitId = String(fd.get("fitId"));
   await prisma.conceptFit.updateMany({ where: { leaseId: id }, data: { chosen: false } });
   const fit = await prisma.conceptFit.update({ where: { id: fitId }, data: { chosen: true } });
-  await prisma.lease.update({ where: { id }, data: { conceptId: fit.conceptId } });
+  await prisma.lease.update({ where: { id }, data: { concepts: { connect: { id: fit.conceptId } } } });
   await audit(u.email, "choose concept fit", "Lease", id, fitId);
   revalidatePath(`/leases/${id}`);
   redirect(`/leases/${id}?fit=${fitId}&msg=${enc("Marked as the concept we're proposing, and linked to this lease.")}#concept`);
@@ -161,15 +161,18 @@ async function leaseNotice(l: { id: string; premises: string; tenancy: string | 
   await autoNotice(status === "Sign" ? "Win" : "Progress", `${status === "Sign" ? "Lease signed" : `Lease moved to ${status}`}: ${where}${l.client ? ` for ${l.client.name}` : ""}. Moved by ${by}.`, `/leases/${l.id}`, "Open lease");
 }
 
-/** Link (or unlink) the concept we're proposing for this lease. */
+/** Link a concept to this lease (a lease can have several), or unlink one with remove=1. */
 export async function setLeaseConcept(fd: FormData) {
   const u = await requireUser([...EDITORS]);
   const id = String(fd.get("id") ?? "");
-  const conceptId = String(fd.get("conceptId") ?? "") || null;
-  if (!id) return;
-  const l = await prisma.lease.update({ where: { id }, data: { conceptId }, include: { concept: { select: { id: true, name: true } } } });
-  await audit(u.email, conceptId ? "link concept" : "unlink concept", "Lease", id, conceptId ?? "");
-  revalidatePath("/leases"); revalidatePath(`/leases/${id}`); if (conceptId) revalidatePath(`/concepts/${conceptId}`);
+  const conceptId = String(fd.get("conceptId") ?? "");
+  const remove = fd.get("remove") === "1";
+  if (!id || !conceptId) return;
+  const c = await prisma.concept.findUnique({ where: { id: conceptId }, select: { name: true } });
+  if (!c) return;
+  await prisma.lease.update({ where: { id }, data: { concepts: remove ? { disconnect: { id: conceptId } } : { connect: { id: conceptId } } } });
+  await audit(u.email, remove ? "unlink concept" : "link concept", "Lease", id, conceptId);
+  revalidatePath("/leases"); revalidatePath(`/leases/${id}`); revalidatePath(`/concepts/${conceptId}`);
   const back = String(fd.get("_back") ?? "");
-  if (back.startsWith("/")) redirect(`${back}${back.includes("?") ? "&" : "?"}msg=${enc(l.concept ? `Concept linked: ${l.concept.name}.` : "Concept unlinked.")}`);
+  if (back.startsWith("/")) redirect(`${back}${back.includes("?") ? "&" : "?"}msg=${enc(remove ? `Concept unlinked: ${c.name}.` : `Concept linked: ${c.name}.`)}`);
 }

@@ -18,7 +18,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
   const view = sp.view === "list" ? "list" : "board";
   const status = LEASE_STATUSES.includes(sp.status) ? sp.status : "all";
   const [raw, clients] = await Promise.all([
-    prisma.lease.findMany({ include: { client: { select: { id: true, name: true } }, concept: { select: { id: true, name: true } } }, orderBy: { updatedAt: "desc" } }),
+    prisma.lease.findMany({ include: { client: { select: { id: true, name: true } }, concepts: { select: { id: true, name: true }, orderBy: { name: "asc" } } }, orderBy: { updatedAt: "desc" } }),
     prisma.client.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
   // Older records may still carry a first-version status: show them under the matching new stage.
@@ -88,7 +88,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                   <Link prefetch={false} href={`/leases/${l.id}`} className="font-semibold brand-text hover:underline">{[l.tenancy, l.premises].filter(Boolean).join(", ")}</Link>
                   <div className="text-xs admin-muted">{[l.centre, l.suburb, l.sizeSqm ? `${l.sizeSqm} m²` : "", l.rentPa ? `${fmtAUD(l.rentPa)}/yr` : ""].filter(Boolean).join(" · ")}</div>
                   {next && <span className={`lease-chip mt-1 ${urgency(next.days)}`}>{next.label} · {inDays(next.days)}</span>}
-                  {l.concept ? <Link prefetch={false} href={`/concepts/${l.concept.id}`} className="text-xs hover:underline">Concept: <b>{l.concept.name}</b></Link>
+                  {l.concepts.length ? <span className="text-xs">{l.concepts.length === 1 ? "Concept" : "Concepts"}: {l.concepts.map((c, i) => <span key={c.id}>{i ? ", " : ""}<Link prefetch={false} href={`/concepts/${c.id}`} className="hover:underline"><b>{c.name}</b></Link></span>)}</span>
                     : l.status === "Concept proposing" && <Link prefetch={false} href={`/leases/${l.id}#concept`} className="text-xs brand-text underline">Pick a concept →</Link>}
                   {canEdit ? (<div className="lease-card-edit">
                     <ClientPicker leaseId={l.id} clientId={l.clientId} clients={clients} />
@@ -109,7 +109,7 @@ export default async function LeasesPage({ searchParams }: { searchParams: Promi
                 <tr key={l.id}>
                   <td><Link prefetch={false} href={`/leases/${l.id}`} className="font-medium brand-text hover:underline">{l.premises}</Link><div className="text-xs admin-muted">{[l.tenancy, l.centre, l.suburb].filter(Boolean).join(" · ")}</div></td>
                   <td>{canEdit ? <ClientPicker leaseId={l.id} clientId={l.clientId} clients={clients} /> : l.client ? <Link prefetch={false} href={`/clients/${l.client.id}`} className="hover:underline">{l.client.name}</Link> : <span className="admin-muted">—</span>}</td>
-                <td>{l.concept ? <Link prefetch={false} href={`/concepts/${l.concept.id}`} className="hover:underline">{l.concept.name}</Link> : <span className="admin-muted">—</span>}</td>
+                <td>{l.concepts.length ? l.concepts.map((c, i) => <span key={c.id}>{i ? ", " : ""}<Link prefetch={false} href={`/concepts/${c.id}`} className="hover:underline">{c.name}</Link></span>) : <span className="admin-muted">—</span>}</td>
                   <td>{canEdit ? (
                     <form action={setLeaseStatus}><input type="hidden" name="id" value={l.id} />
                       <AutoSubmitSelect name="status" defaultValue={l.status} className={`lease-status-select ${LEASE_STATUS_COLOURS[l.status] ?? ""}`}>{LEASE_STATUSES.map((s) => <option key={s}>{s}</option>)}</AutoSubmitSelect>

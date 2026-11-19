@@ -38,6 +38,7 @@ if [ "$WIP_SEED_EXAMPLE" = "1" ] && [ ! -f "$DATA_DIR/.wip-seeded" ]; then
 fi
 
 node_modules/.bin/tsx scripts/migrate-lease-stages.ts
+node_modules/.bin/tsx scripts/migrate-lease-concepts.ts
 node_modules/.bin/tsx scripts/seed-concepts.ts
 
 exec node_modules/.bin/next start -H 0.0.0.0 -p "${PORT:-3100}"

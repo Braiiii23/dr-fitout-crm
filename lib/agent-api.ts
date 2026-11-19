@@ -31,7 +31,7 @@ export function agentAuthError(req: Request, actor: Actor): { status: number; er
 export const RESOURCES: Record<string, { model: string; write: boolean; about: string }> = {
   leads: { model: "Lead", write: true, about: "DR Fitout leads (brand is always DR; category: Turnkey fitout | Joint venture | Normal fitout)" },
   clients: { model: "Client", write: true, about: "Client practices. Link leads/jobs/leases with their clientId." },
-  leases: { model: "Lease", write: true, about: "Tenancies. status (stage): Enquiring | Concept proposing | Sign. Dates YYYY-MM-DD. files is managed by the app." },
+  leases: { model: "Lease", write: true, about: "Tenancies. status (stage): Enquiring | Concept proposing | Sign. Dates YYYY-MM-DD. files is managed by the app. A lease can have several concepts: send linkConcepts / unlinkConcepts as arrays of concept ids." },
   concepts: { model: "Concept", write: true, about: "Concept designs. rooms is JSON [{name, qty, areaSqm, notes}]. files is managed by the app." },
   "concept-fits": { model: "ConceptFit", write: false, about: "AI test fits of a concept onto a lease's floor plan (read only; run one with the concept_fit tool)" },
   notices: { model: "Notice", write: true, about: "My Day notice board posts (category: Update | Progress | Win | Heads up | Site; link = in-app path like /leases/{id}). Posts show under your name (Claude or Grok)." },
@@ -60,7 +60,7 @@ export const RESOURCES: Record<string, { model: string; write: boolean; about: s
 // Fields that only the app itself manages.
 const LOCKED: Record<string, string[]> = {
   CallListItem: ["slotId", "setterId", "business"], Lead: ["brand", "setterId"], Job: ["brand"],
-  Lease: ["files"], Concept: ["files"], ConceptFit: ["result"],
+  Lease: ["files", "conceptId"], Concept: ["files"], ConceptFit: ["result"],
   Notice: ["authorId", "authorName", "auto"], NoticeReply: ["authorId", "authorName"],
 };
 /** Values Grok can't choose: this is a DR Fitout-only CRM. */
@@ -173,9 +173,25 @@ export async function getRow(name: string, id: string): Promise<Out> {
   return { row };
 }
 
+/** Leases hold a list of concepts. Pull linkConcepts / unlinkConcepts out of the body and check the ids. */
+async function conceptLinks(model: string, body: Record<string, unknown>, current: { id: string; name: string }[]) {
+  if (model !== "Lease" || (body.linkConcepts === undefined && body.unlinkConcepts === undefined)) return null;
+  const ids = (v: unknown) => (Array.isArray(v) ? v : v ? [v] : []).map(String);
+  const link = ids(body.linkConcepts), unlink = ids(body.unlinkConcepts);
+  delete body.linkConcepts; delete body.unlinkConcepts;
+  const found = await prisma.concept.findMany({ where: { id: { in: [...link, ...unlink] } }, select: { id: true, name: true } });
+  const missing = [...link, ...unlink].filter((id) => !found.some((c) => c.id === id));
+  if (missing.length) throw new Error(`No concept with id ${missing.join(", ")}`);
+  const after = [...current.filter((c) => !unlink.includes(c.id)), ...found.filter((c) => link.includes(c.id) && !current.some((x) => x.id === c.id))];
+  const names = (l: { name: string }[]) => l.map((c) => c.name).sort().join(", ") || null;
+  return { link, unlink, change: names(current) === names(after) ? null : { from: names(current), to: names(after) } };
+}
+
 export async function createRow(actor: Actor, name: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
   const r = table(name);
   if (!r.write) throw new Error(`${name} is read only`);
+  body = { ...body };
+  const links = await conceptLinks(r.model, body, []);
   const { data, errors } = coerce(r.model, body, true);
   Object.assign(data, FIXED[r.model] ?? {});
   if (r.model === "Notice" || r.model === "NoticeReply") data.authorName = actor.label;
@@ -183,9 +199,9 @@ export async function createRow(actor: Actor, name: string, body: Record<string,
   const nf = notesField(r.model);
   if (nf && body.appendNotes) data[nf] = appendTo(data[nf] as string | null, body.appendNotes, actor.label);
   if (errors.length) throw new Error(errors.join("; "));
-  if (dryRun) return { dryRun: true, wouldCreate: data };
+  if (dryRun) return { dryRun: true, wouldCreate: links?.change ? { ...data, concepts: links.change.to } : data };
   try {
-    const row = await delegate(r.model).create({ data });
+    const row = await delegate(r.model).create({ data: links ? { ...data, concepts: { connect: links.link.map((id) => ({ id })) } } : data });
     await afterWrite(r.model, row.id, null);
     await agentAudit(actor, "create", r.model, row.id, Object.keys(data).join(", "));
     return { created: await delegate(r.model).findUnique({ where: { id: row.id } }) };
@@ -195,18 +211,21 @@ export async function createRow(actor: Actor, name: string, body: Record<string,
 export async function updateRow(actor: Actor, name: string, id: string, body: Record<string, unknown>, dryRun: boolean): Promise<Out> {
   const r = table(name);
   if (!r.write) throw new Error(`${name} is read only`);
-  const before = await delegate(r.model).findUnique({ where: { id } });
+  const before = await delegate(r.model).findUnique({ where: { id }, ...(r.model === "Lease" ? { include: { concepts: { select: { id: true, name: true } } } } : {}) });
   if (!before) throw new Error("Not found");
+  body = { ...body };
+  const links = await conceptLinks(r.model, body, (before.concepts ?? []) as { id: string; name: string }[]);
   const { data, errors } = coerce(r.model, body, false);
   if (r.model === "Concept" && body.rooms !== undefined && typeof body.rooms !== "string") data.rooms = JSON.stringify(body.rooms);
   const nf = notesField(r.model);
   if (body.appendNotes) { if (!nf) errors.push(`${name} has no notes field`); else data[nf] = appendTo((data[nf] as string | undefined) ?? before[nf], body.appendNotes, actor.label); }
   if (errors.length) throw new Error(errors.join("; "));
-  const changes = diff(before, data);
+  const changes: Record<string, { from: unknown; to: unknown }> = diff(before, data);
+  if (links?.change) changes.concepts = links.change;
   if (dryRun) return { dryRun: true, changes };
   if (!Object.keys(changes).length) return { changes: {}, note: "Nothing to change" };
   try {
-    await delegate(r.model).update({ where: { id }, data });
+    await delegate(r.model).update({ where: { id }, data: links?.change ? { ...data, concepts: { connect: links.link.map((c) => ({ id: c })), disconnect: links.unlink.map((c) => ({ id: c })) } } : data });
     await afterWrite(r.model, id, before);
     await agentAudit(actor, "update", r.model, id, Object.keys(changes).join(", "));
     return { changes, row: await delegate(r.model).findUnique({ where: { id } }) };
