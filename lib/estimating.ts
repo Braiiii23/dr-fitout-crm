@@ -26,8 +26,24 @@ export const TRADES = [
 export const TRADE_STATUSES = ["Requested", "Received", "Accepted", "Declined", "AI estimate"] as const;
 export const AI_EST = "AI estimate";
 
+/** Estimate bands, in the GROK Proposal Base Template order. Trade pack quotes should use these names. */
+export const BANDS = [
+  "Preliminaries", "Demolition", "New Construction", "Flooring", "Tiling", "Painting", "Plastering", "Joinery", "Mechanical", "Upholstery",
+  "Fire Services", "Stone", "CCTV", "Glazing", "Shopfront", "Stainless Steel", "Plumbing", "Electrical", "Signage", "Miscellaneous",
+];
+/** Bands carried at cost (no margin). Everything else, Mechanical included, carries the margin. */
+export const AT_COST_BANDS = ["Preliminaries", "Miscellaneous"];
+export const DEFAULT_MARGIN_PCT = 35;
+/** Sell ex GST: margin on every band except Preliminaries and Miscellaneous. */
+export function sellFromBands(bands: { trade: string; amount: number }[], marginPct: number) {
+  const r = (n: number) => Math.ceil(n * 10) / 10; // round up to the next 10 cents
+  return r(bands.reduce((s, b) => s + (AT_COST_BANDS.includes(b.trade) ? b.amount : b.amount * (1 + marginPct / 100)), 0));
+}
+
 type TQ = { trade: string; price: number | null; status: string };
-/** Per trade: the quote that counts (Accepted, otherwise the cheapest Received, otherwise Claude's AI estimate). Total = sum of those. */
+/** Per trade: the quote that counts. Without an AI estimate: Accepted, otherwise the cheapest Received.
+ *  With an AI estimate (ENP rule, 9 Nov): a real quote HIGHER than the estimate replaces it; a LOWER quote doesn't,
+ *  the estimate stays as the price and the lower quote is kept as the procurement option. */
 export function summariseTrades<T extends TQ>(quotes: T[]) {
   const byTrade = new Map<string, T[]>();
   for (const q of quotes) byTrade.set(q.trade, [...(byTrade.get(q.trade) ?? []), q]);
@@ -36,8 +52,15 @@ export function summariseTrades<T extends TQ>(quotes: T[]) {
     const accepted = qs.find((q) => q.status === "Accepted" && q.price != null) ?? null;
     const cheapest = priced.length ? priced.reduce((a, b) => ((a.price ?? 0) <= (b.price ?? 0) ? a : b)) : null;
     const ai = qs.find((q) => q.status === AI_EST && q.price != null) ?? null;
-    const counts = accepted ?? cheapest ?? ai;
-    return { trade, quotes: qs, counts, basis: accepted ? "Accepted" : cheapest ? "Lowest received" : ai ? AI_EST : "Waiting", waiting: qs.filter((q) => q.status === "Requested").length };
+    const real = accepted ?? cheapest;
+    let counts: T | null, basis: string, lowerQuote: T | null = null;
+    if (ai && real) {
+      if ((real.price ?? 0) >= (ai.price ?? 0)) { counts = real; basis = (real.price ?? 0) > (ai.price ?? 0) ? "Quote higher than estimate" : "Quote (on the estimate sheet)"; }
+      else { counts = ai; basis = "Estimate kept (lower quote)"; lowerQuote = real; }
+    } else if (real) { counts = real; basis = accepted ? "Accepted" : "Lowest received"; }
+    else if (ai) { counts = ai; basis = AI_EST; }
+    else { counts = null; basis = "Waiting"; }
+    return { trade, quotes: qs, counts, basis, lowerQuote, waiting: qs.filter((q) => q.status === "Requested").length };
   }).sort((a, b) => a.trade.localeCompare(b.trade));
   const total = rows.reduce((n, r) => n + (r.counts?.price ?? 0), 0);
   return {

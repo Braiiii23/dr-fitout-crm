@@ -12,12 +12,15 @@ import { prisma } from "./db";
 import { aiChat, aiConfig, jsonFrom, type AiPart } from "./ai";
 import { loadFile } from "./files";
 import { parseFiles, parseRooms, roomsTotal, type StoredFile } from "./concepts";
-import { TRADES, summariseTrades, AI_EST } from "./estimating";
+import { BANDS, summariseTrades, AI_EST, DEFAULT_MARGIN_PCT } from "./estimating";
+import { DEFAULT_RATE_NOTES, ESTIMATING_RULES } from "./estimate-rules";
+import { summarise, up10c, SOURCES, type SheetLine } from "./estimate-sheet";
+import { syncTradePack } from "./estimate-sync";
 
 const run = promisify(execFile);
 export const EST_FILE_KINDS = ["plans", "photo", "other"];
 
-export type EstLine = { item: string; qty: number; unit: string; rate: number; amount: number };
+export type EstLine = { item: string; clientText: string; qty: number; unit: string; supplyRate: number; installRate: number; source: string; sourceNote: string; provisional: boolean; amount: number; rate?: number };
 export type EstTrade = { trade: string; amount: number; scope: string; basis: string; lines: EstLine[] };
 export type AiEstimate = {
   summary: string; confidence: "Low" | "Medium" | "High"; pricingBasis: string;
@@ -93,21 +96,22 @@ async function images(f: StoredFile, pages: number): Promise<{ label: string; da
   } catch { return []; } finally { await rm(dir, { recursive: true, force: true }); }
 }
 
-const SYSTEM = `You are DR Fitout's estimator. DR Fitout designs and builds medical and allied-health fitouts (GP clinics, allied health, dental, psychology, specialists) in Brisbane / South-East Queensland, Australia.
-Price this job as a first-pass estimate the way a senior fitout estimator would: measure what you can from the plans (areas, partition lengths, door counts, wet rooms, ceilings, joinery runs, power/data points), read the site photos for existing conditions (demolition, services, ceiling, floor, shopfront), and use the concept's room schedule and finishes for what is being built.
-PRICES: use DR Fitout's own past costs (given as $/m² per trade and a list of past jobs) as your main guide, scaled to this job's size and spec. Where past data is missing or thin for a trade, use current Brisbane commercial fitout rates and say so in that trade's "basis". House rates and rules from DR Fitout override everything else.
-All money is AUD ex GST. Price trade costs (what subcontractors would charge us), not the sell price: the app adds contingency and margin.
-Use ONLY these trade names: ${TRADES.join(", ")}. Leave a trade out if it isn't needed. Builder's own costs that aren't a trade (site supervision, prelims, waste removal, protection, permits/certification, consultants, travel, small materials) go in otherCosts, itemised.
-Each trade gets itemised lines (item, qty, unit, rate, amount = qty x rate) that add up to the trade amount. Keep it to the lines that matter (usually 2-8 per trade).
-Also write the scope of works: short lines grouped by trade, like an estimator's scope reference (what is included). Mark byClient true for items the client or landlord supplies.
-Never invent site facts: put guesses in assumptions, things to confirm on site or with the landlord in checks (e.g. base-build mechanical, sprinklers, sewer points, asbestos, after-hours works), and what isn't included in exclusions.
-confidence: High only with dimensioned plans and good past data; Low when working mainly from a brief.
+const SYSTEM = `You are DR Fitout's estimator. DR Fitout designs and builds medical and allied-health fitouts in Brisbane / South-East Queensland, Australia (sister company of ENP Fitouts; same rates, rules and terms).
+Build a first-pass estimate the way our estimator does it: read every plan sheet (areas, wall runs, heights, doors, wet rooms, ceilings, joinery, electrical symbols), read the site photos for existing conditions, use the concept's room schedule and finishes, then quantify and price every scope item line by line.
+All money is AUD ex GST AT COST (what it costs us). The app adds the margin; do NOT add margin or contingency.
+Use ONLY these band names, in this order: ${BANDS.join(", ")}. Leave a band out if it isn't needed.
+
+${ESTIMATING_RULES}
+
+OUTPUT
+Each band's lines: item (internal description, with the plan reference / derivation in sourceNote), clientText (the proposal wording: "Supply and install ..." with counts only, e.g. "Supply and install 22 x LED downlights", or "Allowance for ..." for prelims and services; no m², lm or rates), qty, unit (lm, m2, ea, hr, item), supplyRate and installRate ($/unit, either can be 0 for all-in labour or all-in supply), source (one of ${SOURCES.join(", ")}), sourceNote (where the rate and quantity came from), provisional (true for provisional sums).
+Also write the scope of works reference (short lines per band) and lists of assumptions, checks (questions / things to confirm, each with your proposed answer) and exclusions.
+confidence: High only with dimensioned plans and good rate data; Low when working mainly from a brief.
 Reply with JSON matching exactly:
 {"summary": string, "confidence": "Low"|"Medium"|"High", "pricingBasis": string, "areaSqm": number|null,
- "trades": [{"trade": string, "amount": number, "scope": string, "basis": string, "lines": [{"item": string, "qty": number, "unit": string, "rate": number, "amount": number}]}],
+ "trades": [{"trade": string (band), "scope": string, "basis": string, "lines": [{"item": string, "clientText": string, "qty": number, "unit": string, "supplyRate": number, "installRate": number, "source": string, "sourceNote": string, "provisional": boolean}]}],
  "scope": [{"trade": string, "description": string, "byClient": boolean}],
- "otherCosts": {"amount": number, "items": [{"item": string, "amount": number}]},
- "contingencyPct": number, "assumptions": string[], "exclusions": string[], "checks": string[]}`;
+ "assumptions": string[], "exclusions": string[], "checks": string[]}`;
 
 export async function runAiEstimate(leadId: string, o: { conceptId?: string | null; brief?: string | null; by: string }) {
   if (!aiConfig()) throw new Error("Claude isn't set up. Add ANTHROPIC_API_KEY on the server.");
@@ -152,18 +156,17 @@ export async function runAiEstimate(leadId: string, o: { conceptId?: string | nu
     `\nDR FITOUT'S PAST COSTS (${bench.past.length} past job${bench.past.length === 1 ? "" : "s"}${bench.overallPerSqm ? `, median all trades ≈ $${bench.overallPerSqm}/m²` : ""}):`,
     bench.rates.length ? bench.rates.map((r) => `- ${r.trade}: median $${r.perSqm}/m² (range $${r.low}-$${r.high}, ${r.n} job${r.n === 1 ? "" : "s"})`).join("\n") : "- none with a known size yet: use Brisbane market rates and say so",
     ...bench.past.slice(0, 15).map((p) => `- ${p.name} (${p.source}${p.sizeSqm ? `, ${p.sizeSqm} m²` : ""}${p.type ? `, ${p.type}` : ""}${p.sell ? `, sold $${Math.round(p.sell)}` : ""}): ${Object.entries(p.byTrade).map(([t, v]) => `${t} $${Math.round(v)}`).join("; ")}`),
-    settings?.estRateNotes ? `\nHOUSE RATES AND RULES (override everything else):\n${settings.estRateNotes.slice(0, 6000)}` : "",
+    `\nOUR STANDARD RATES AND HOUSE RULES (override everything else):\n${(settings?.estRateNotes || DEFAULT_RATE_NOTES).slice(0, 12000)}`,
     pics.length ? `\nATTACHED IMAGES, in order: ${pics.map((p, i) => `${i + 1}. ${p.label}`).join("; ")}` : "\nNo plans or photos attached: estimate from the brief, concept and size, and set confidence Low.",
   ].filter(Boolean).join("\n");
 
   const parts: AiPart[] = [{ type: "text", text }, ...pics.map((p) => ({ type: "image" as const, dataUrl: p.dataUrl }))];
   const r = await aiChat({ feature: "estimate", system: SYSTEM, messages: [{ role: "user", content: parts }], vision: true, json: true, effort: "medium", maxTokens: 32000, timeoutMs: 280000 });
   const est = clean(jsonFrom<AiEstimate>(r.text));
-  const goal = settings?.grossMarginGoal ?? 25;
-  const tradeTotal = est.trades.reduce((a, t) => a + t.amount, 0);
-  const cost = (tradeTotal + est.otherCosts.amount) * (1 + est.contingencyPct / 100);
+  const marginPct = lead.estMarginPct ?? settings?.estMarginPct ?? DEFAULT_MARGIN_PCT;
+  const sum = summarise(toSheet(est), marginPct);
   const full: AiEstimate = {
-    ...est, tradeTotal: Math.round(tradeTotal), cost: Math.round(cost), gpGoal: goal, suggestedSell: Math.round(cost / (1 - goal / 100) / 100) * 100,
+    ...est, tradeTotal: Math.round(sum.cost * 100) / 100, cost: Math.round(sum.cost * 100) / 100, gpGoal: marginPct, suggestedSell: sum.sell,
     pastJobsUsed: bench.past.length, conceptName: concept?.name ?? null, model: r.model, by: o.by, appliedAt: null,
     inputs: [...pics.map((p) => p.label), concept ? `Concept: ${concept.name}` : "", brief ? "Brief" : "", size ? `${size} m²` : ""].filter(Boolean),
   };
@@ -171,67 +174,84 @@ export async function runAiEstimate(leadId: string, o: { conceptId?: string | nu
   return full;
 }
 
-const TRADE_WORDS: [RegExp, string][] = [
-  [/demol|strip.?out|make.?good/, "Demolition"], [/paint|wall.?cover/, "Painting"], [/join|cabinet|millwork/, "Joinery"], [/plaster|ceiling|partition|wall|lining/, "Plasterboard & ceilings"],
-  [/carpent|framing|door|hardware/, "Carpentry"], [/data|comms|network|cabling/, "Data & comms"], [/electric|power|light|switch/, "Electrical"],
-  [/plumb|hydraulic|sanitary|sewer|drain/, "Plumbing"], [/mech|hvac|air.?con|a\/c|ventil|duct/, "Mechanical / HVAC"], [/fire|sprinkler|smoke|evac/, "Fire services"],
-  [/floor|vinyl|carpet|tile/, "Flooring"], [/glaz|glass|shopfront|window/, "Glazing"], [/sign/, "Signage"], [/clean/, "Cleaning"],
-];
 
-/** Keep numbers sane and trade names on our list; amounts always equal the sum of their lines when there are lines. */
+/** Keep numbers sane and band names on our list. */
 function clean(e: AiEstimate): AiEstimate {
   const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : 0; };
-  const tradeName = (t: unknown) => {
+  const bandName = (t: unknown) => {
     const v = String(t ?? "").toLowerCase().trim();
-    const exact = TRADES.find((x) => x.toLowerCase() === v);
+    const exact = BANDS.find((x) => x.toLowerCase() === v);
     if (exact) return exact;
-    const hit = TRADE_WORDS.find(([re]) => re.test(v));
-    return hit ? hit[1] : "Other";
+    const hit = BAND_WORDS.find(([re]) => re.test(v));
+    return hit ? hit[1] : "Miscellaneous";
   };
   const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? v : []) as T[];
   const merged = new Map<string, EstTrade>();
   for (const t of arr<EstTrade>(e.trades)) {
-    const lines = arr<EstLine>(t.lines).map((l) => { const qty = num(l.qty), rate = num(l.rate); return { item: String(l.item ?? "").slice(0, 200), qty, unit: String(l.unit ?? "").slice(0, 20), rate, amount: num(l.amount) || Math.round(qty * rate * 100) / 100 }; }).filter((l) => l.item);
-    const amount = lines.length ? lines.reduce((a, l) => a + l.amount, 0) : num(t.amount);
-    if (amount <= 0) continue;
-    const name = tradeName(t.trade);
+    const lines: EstLine[] = arr<EstLine>(t.lines).map((l) => {
+      const qty = num(l.qty); let supplyRate = num(l.supplyRate), installRate = num(l.installRate);
+      if (!supplyRate && !installRate && l.rate) installRate = num(l.rate);
+      const src = String(l.source ?? "").toUpperCase().trim();
+      return { item: String(l.item ?? "").slice(0, 300), clientText: String(l.clientText ?? "").slice(0, 500), qty, unit: String(l.unit ?? "").slice(0, 20), supplyRate, installRate,
+        source: (SOURCES as readonly string[]).includes(src) ? src : "ESTIMATE", sourceNote: String(l.sourceNote ?? "").slice(0, 500), provisional: !!l.provisional, amount: up10c(qty * (supplyRate + installRate)) };
+    }).filter((l) => l.item && l.amount > 0);
+    if (!lines.length) continue;
+    const name = bandName(t.trade);
     const prev = merged.get(name);
-    if (prev) { prev.lines.push(...lines); prev.amount += amount; prev.scope = [prev.scope, t.scope].filter(Boolean).join("; "); }
-    else merged.set(name, { trade: name, amount, scope: String(t.scope ?? "").slice(0, 1000), basis: String(t.basis ?? "").slice(0, 300), lines });
+    if (prev) { prev.lines.push(...lines); prev.scope = [prev.scope, t.scope].filter(Boolean).join("; "); }
+    else merged.set(name, { trade: name, amount: 0, scope: String(t.scope ?? "").slice(0, 1000), basis: String(t.basis ?? "").slice(0, 300), lines });
   }
-  const otherItems = arr<{ item: string; amount: number }>(e.otherCosts?.items).map((i) => ({ item: String(i.item ?? "").slice(0, 200), amount: num(i.amount) })).filter((i) => i.item && i.amount > 0);
-  const strs = (v: unknown) => arr<unknown>(v).map((s) => String(s).slice(0, 400)).filter(Boolean).slice(0, 20);
+  for (const t of merged.values()) t.amount = Math.round(t.lines.reduce((a, l) => a + l.amount, 0) * 100) / 100;
+  const strs = (v: unknown) => arr<unknown>(v).map((x) => String(x).slice(0, 400)).filter(Boolean).slice(0, 25);
   return {
     summary: String(e.summary ?? "").slice(0, 2000), confidence: (["Low", "Medium", "High"].includes(e.confidence) ? e.confidence : "Low") as AiEstimate["confidence"],
     pricingBasis: String(e.pricingBasis ?? "").slice(0, 1000), areaSqm: e.areaSqm ? num(e.areaSqm) : null,
-    trades: [...merged.values()].map((t) => ({ ...t, amount: Math.round(t.amount) })).sort((a, b) => TRADES.indexOf(a.trade) - TRADES.indexOf(b.trade)),
-    scope: arr<{ trade: string; description: string; byClient?: boolean }>(e.scope).map((s) => ({ trade: tradeName(s.trade), description: String(s.description ?? "").slice(0, 500), byClient: !!s.byClient })).filter((s) => s.description).slice(0, 150),
-    otherCosts: { amount: Math.round(otherItems.length ? otherItems.reduce((a, i) => a + i.amount, 0) : num(e.otherCosts?.amount)), items: otherItems },
-    contingencyPct: Math.min(25, num(e.contingencyPct)),
+    trades: [...merged.values()].sort((a, b) => BANDS.indexOf(a.trade) - BANDS.indexOf(b.trade)),
+    scope: arr<{ trade: string; description: string; byClient?: boolean }>(e.scope).map((x) => ({ trade: bandName(x.trade), description: String(x.description ?? "").slice(0, 500), byClient: !!x.byClient })).filter((x) => x.description).slice(0, 150),
+    otherCosts: { amount: 0, items: [] }, contingencyPct: 0,
     assumptions: strs(e.assumptions), exclusions: strs(e.exclusions), checks: strs(e.checks),
   };
 }
 
-/** Put the reviewed estimate into the trade pack. Replaces earlier AI-estimate prices; never touches real quotes. */
+const BAND_WORDS: [RegExp, string][] = [
+  [/prelim|site set|supervis|project manag/, "Preliminaries"], [/demol|strip.?out|make.?good/, "Demolition"], [/upholst/, "Upholstery"],
+  [/stone|benchtop/, "Stone"], [/join|cabinet|millwork/, "Joinery"], [/tile|tiling|waterproof|screed|wet area/, "Tiling"],
+  [/plaster(ing)?$|set.?(and|&).?finish/, "Plastering"], [/paint|wall.?cover|coating/, "Painting"],
+  [/partition|stud|ceiling|bulkhead|door|skirting|silicone|carpent|framing|plasterboard|new construction|access panel|backing/, "New Construction"],
+  [/floor|vinyl|carpet/, "Flooring"], [/cctv|security camera/, "CCTV"], [/fire|sprinkler|smoke|evac/, "Fire Services"],
+  [/mech|hvac|air.?con|a\/c|ventil|duct|exhaust|canopy/, "Mechanical"], [/stainless|\bss\b/, "Stainless Steel"], [/shopfront|cladding/, "Shopfront"],
+  [/glaz|glass|window/, "Glazing"], [/plumb|hydraulic|sanitary|sewer|drain/, "Plumbing"], [/electric|power|light|switch|data|comms/, "Electrical"], [/sign/, "Signage"],
+  [/misc|clean|rubbish|waste|certif/, "Miscellaneous"],
+];
+
+/** The estimate's lines as estimate sheet rows. */
+export function toSheet(e: AiEstimate): SheetLine[] {
+  let n = 0;
+  return e.trades.flatMap((t) => t.lines.map((l) => ({ band: t.trade, item: l.item, clientText: l.clientText || null, qty: l.qty, unit: l.unit || null, supplyRate: l.supplyRate, installRate: l.installRate, source: l.source, sourceNote: l.sourceNote || null, provisional: l.provisional, sortOrder: n++ })));
+}
+
+/** Put the reviewed estimate onto the estimate sheet (replacing the sheet's rows), add new scope lines, and update the trade pack. */
 export async function applyAiEstimate(leadId: string, o: { setQuote: boolean; by: string }) {
   const lead = await prisma.lead.findUnique({ where: { id: leadId }, include: { scopeItems: true } });
   if (!lead?.aiEstimate) throw new Error("Run the AI estimate first.");
   const est = JSON.parse(lead.aiEstimate) as AiEstimate;
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-  const have = new Set(lead.scopeItems.map((s) => `${norm(s.trade)}|${norm(s.description)}`));
-  let sort = lead.scopeItems.reduce((m, s) => Math.max(m, s.sortOrder), 0) + 1;
-  const newScope = est.scope.filter((s) => !have.has(`${norm(s.trade)}|${norm(s.description)}`));
-  const lineText = (t: EstTrade) => [t.scope, ...t.lines.map((l) => `${l.item}: ${l.qty} ${l.unit} @ $${l.rate} = $${Math.round(l.amount)}`)].filter(Boolean).join("\n");
+  if (!est.trades?.[0]?.lines?.[0] || est.trades[0].lines[0].supplyRate === undefined) throw new Error("This estimate was made before the estimate sheet existed. Press Estimate again first.");
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const have = new Set(lead.scopeItems.map((x) => `${norm(x.trade)}|${norm(x.description)}`));
+  let sort = lead.scopeItems.reduce((m, x) => Math.max(m, x.sortOrder), 0) + 1;
+  const newScope = est.scope.filter((x) => !have.has(`${norm(x.trade)}|${norm(x.description)}`));
+  const rows = toSheet(est);
+  const proposal = { ...JSON.parse(lead.estProposal || "{}"), exclusions: est.exclusions, assumptions: est.assumptions };
   await prisma.$transaction([
-    prisma.tradeQuote.deleteMany({ where: { leadId, status: AI_EST } }),
-    prisma.tradeQuote.createMany({ data: est.trades.map((t) => ({ leadId, trade: t.trade, company: "AI estimate (Claude)", scope: lineText(t).slice(0, 5000), price: t.amount, status: AI_EST })) }),
-    prisma.scopeItem.createMany({ data: newScope.map((s) => ({ leadId, trade: s.trade, description: s.description, byClient: !!s.byClient, sortOrder: sort++ })) }),
+    prisma.estimateLine.deleteMany({ where: { leadId } }),
+    prisma.estimateLine.createMany({ data: rows.map((x) => ({ ...x, leadId })) }),
+    prisma.scopeItem.createMany({ data: newScope.map((x) => ({ leadId, trade: x.trade, description: x.description, byClient: !!x.byClient, sortOrder: sort++ })) }),
     prisma.lead.update({ where: { id: leadId }, data: {
-      ...(lead.estOtherCosts == null ? { estOtherCosts: est.otherCosts.amount } : {}),
-      ...(lead.estContingencyPct == null ? { estContingencyPct: est.contingencyPct } : {}),
+      estProposal: JSON.stringify(proposal),
       ...(o.setQuote && est.suggestedSell ? { quoteValue: est.suggestedSell } : {}),
       aiEstimate: JSON.stringify({ ...est, appliedAt: new Date().toISOString(), appliedBy: o.by }),
     } }),
   ]);
-  return { trades: est.trades.length, scope: newScope.length, otherSet: lead.estOtherCosts == null, contSet: lead.estContingencyPct == null };
+  await syncTradePack(leadId);
+  return { trades: est.trades.length, lines: rows.length, scope: newScope.length };
 }

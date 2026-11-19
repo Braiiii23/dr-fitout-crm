@@ -3,6 +3,8 @@ import { fmtDateTime } from "@/lib/time";
 import PendingButton from "@/components/PendingButton";
 import type { AiEstimate } from "@/lib/estimate-ai";
 import type { StoredFile } from "@/lib/concepts";
+import { DEFAULT_RATE_NOTES } from "@/lib/estimate-rules";
+import { AT_COST_BANDS } from "@/lib/estimating";
 import { uploadEstFiles, removeEstFile, runEstimate, applyEstimate, saveRateNotes } from "@/app/(app)/estimating/ai-actions";
 
 type Props = {
@@ -22,7 +24,7 @@ export default function AiEstimatePanel(p: Props) {
         <div>
           <div className="est-k">AI estimate</div>
           <h2 className="est-h2" style={{ margin: 0 }}>Let Claude price this job</h2>
-          <p className="est-hint">Upload the plans and site photos, pick the concept, add a brief. Claude measures what it can, prices each trade from DR Fitout&apos;s past jobs (Brisbane market rates where there&apos;s no history), and writes the scope. Nothing changes in the trade pack until you press <b>Use this estimate</b>.</p>
+          <p className="est-hint">Upload the plans and site photos, pick the concept, add a brief. Claude follows our estimating rules: it measures from the plans, prices every line as supply + install from the standard rates, past jobs and quotes (protective high end where there&apos;s no data, tagged ESTIMATE), and writes the scope and proposal wording. Nothing changes until you press <b>Put on the estimate sheet</b>.</p>
         </div>
       </div>
 
@@ -65,11 +67,10 @@ export default function AiEstimatePanel(p: Props) {
       {e && (
         <div className="ai-est-result">
           <div className="ai-est-top">
-            <div><div className="est-k">Trade costs</div><div className="est-big">{fmtAUD(e.tradeTotal ?? 0)}</div></div>
-            <div><div className="est-k">+ other costs</div><div className="ai-est-num">{fmtAUD(e.otherCosts.amount)}</div></div>
-            <div><div className="est-k">+ contingency</div><div className="ai-est-num">{e.contingencyPct}%</div></div>
-            <div><div className="est-k">Job cost</div><div className="ai-est-num"><b>{fmtAUD(e.cost ?? 0)}</b></div></div>
-            <div><div className="est-k">Sell at {e.gpGoal}% GP</div><div className="ai-est-num"><b>{fmtAUD(e.suggestedSell ?? 0)}</b></div></div>
+            <div><div className="est-k">Cost (ex GST)</div><div className="est-big">{fmtAUD(e.cost ?? 0)}</div></div>
+            <div><div className="est-k">Margin</div><div className="ai-est-num">{e.gpGoal}% on cost</div></div>
+            <div><div className="est-k">Sell ex GST</div><div className="ai-est-num"><b>{fmtAUD(e.suggestedSell ?? 0)}</b></div></div>
+            <div><div className="est-k">Lines to check (ESTIMATE)</div><div className="ai-est-num">{e.trades.reduce((n, t) => n + t.lines.filter((l) => l.source === "ESTIMATE").length, 0)}</div></div>
             <div><div className="est-k">Confidence</div><div className={`ai-est-conf ai-est-conf-${e.confidence.toLowerCase()}`}>{e.confidence}</div></div>
           </div>
           <p className="text-sm">{e.summary}</p>
@@ -81,20 +82,20 @@ export default function AiEstimatePanel(p: Props) {
 
           <div className="overflow-x-auto">
             <table className="table tp-table ai-est-table">
-              <thead><tr><th>Trade</th><th>What&apos;s priced</th><th className="tp-price">Price ex GST</th></tr></thead>
+              <thead><tr><th>Band</th><th>What&apos;s priced</th><th className="tp-price">Cost</th><th className="tp-price">Sell</th></tr></thead>
               <tbody>{e.trades.map((t) => (
                 <tr key={t.trade}>
                   <td><b>{t.trade}</b></td>
                   <td>
-                    <details><summary>{t.scope || `${t.lines.length} items`}</summary>
-                      <table className="ai-est-lines"><tbody>{t.lines.map((l, i) => (
-                        <tr key={i}><td>{l.item}</td><td className="tp-price">{l.qty} {l.unit}</td><td className="tp-price">@ {fmtAUD(l.rate)}</td><td className="tp-price">{fmtAUD(Math.round(l.amount))}</td></tr>))}</tbody></table>
+                    <details><summary>{t.scope || `${t.lines.length} lines`}</summary>
+                      <table className="ai-est-lines"><thead><tr><th>Item</th><th>Qty</th><th>Supply</th><th>Install</th><th>Cost</th><th>Source</th></tr></thead><tbody>{t.lines.map((l, i) => (
+                        <tr key={i} title={l.sourceNote}><td>{l.item}{l.provisional ? " (PS)" : ""}</td><td className="tp-price">{l.qty} {l.unit}</td><td className="tp-price">{fmtAUD(l.supplyRate)}</td><td className="tp-price">{fmtAUD(l.installRate)}</td><td className="tp-price">{fmtAUD(l.amount)}</td><td><span className={`es-key es-src-${l.source.replace(/\s/g, "").toLowerCase()}`}>{l.source}</span></td></tr>))}</tbody></table>
                       {t.basis && <p className="text-xs admin-muted">Basis: {t.basis}</p>}
                     </details>
                   </td>
                   <td className="tp-price">{fmtAUD(t.amount)}</td>
+                  <td className="tp-price">{fmtAUD(AT_COST_BANDS.includes(t.trade) ? t.amount : Math.ceil(t.amount * (1 + (e.gpGoal ?? 35) / 100) * 10) / 10)}</td>
                 </tr>))}
-                {e.otherCosts.amount > 0 && <tr><td><b>Other costs</b></td><td>{e.otherCosts.items.map((i) => `${i.item} ${fmtAUD(Math.round(i.amount))}`).join(" · ")}</td><td className="tp-price">{fmtAUD(e.otherCosts.amount)}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -111,11 +112,11 @@ export default function AiEstimatePanel(p: Props) {
           {p.canEdit && (
             <form action={applyEstimate} className="ai-est-use">
               <input type="hidden" name="id" value={p.id} />
-              <label className="ai-est-check"><input type="checkbox" name="setQuote" defaultChecked={!p.quoteValue} /> Also set the quote amount to {fmtAUD(e.suggestedSell ?? 0)} ({e.gpGoal}% GP){p.quoteValue ? `, replacing ${fmtAUD(p.quoteValue)}` : ""}</label>
-              <PendingButton pending="Filling the trade pack…">{e.appliedAt ? "Use this estimate again" : "Use this estimate"}</PendingButton>
+              <label className="ai-est-check"><input type="checkbox" name="setQuote" defaultChecked={!p.quoteValue} /> Also set the quote amount to {fmtAUD(e.suggestedSell ?? 0)} ex GST{p.quoteValue ? `, replacing ${fmtAUD(p.quoteValue)}` : ""}</label>
+              <PendingButton pending="Filling the estimate sheet…">{e.appliedAt ? "Put on the estimate sheet again" : "Put on the estimate sheet"}</PendingButton>
               <p className="text-xs admin-muted" style={{ flexBasis: "100%" }}>
                 {e.appliedAt ? `Used ${fmtDateTime(new Date(e.appliedAt))}${e.appliedBy ? ` by ${e.appliedBy}` : ""}. ` : ""}
-                Adds each trade as an &ldquo;AI estimate&rdquo; price (replacing earlier AI prices) and the new scope lines. A real quote marked Received or Accepted takes over that trade automatically. Other costs and contingency are only filled if they&apos;re empty.
+                Replaces the rows on the estimate sheet with these lines (you then edit them there like the Excel), adds the new scope lines, and puts each band&apos;s cost into the trade pack. A real quote higher than a band&apos;s estimate replaces it; a lower one is kept for procurement.
               </p>
             </form>
           )}
@@ -124,10 +125,10 @@ export default function AiEstimatePanel(p: Props) {
 
       {p.isAdminOrEstimator && (
         <details className="ai-est-rates" id="house-rates">
-          <summary className="acc-link">House rates &amp; rules Claude uses for every estimate{p.rateNotes ? "" : " (none yet)"}</summary>
+          <summary className="acc-link">Standard rates &amp; house rules Claude uses for every estimate{p.rateNotes ? " (edited)" : " (built-in standard rates)"}</summary>
           <form action={saveRateNotes} className="mt-2 space-y-2">
             <input type="hidden" name="id" value={p.id} />
-            <textarea name="estRateNotes" rows={8} className="input" defaultValue={p.rateNotes ?? ""} placeholder={"e.g.\nPlasterboard partition to ceiling, 2 sides + insulation: $145/m²\nGP consult room joinery (base + overhead): $4,800 each\nSupervision: $2,800/week; typical GP clinic program 8-10 weeks\nAlways allow acoustic insulation to consult room walls\nUse 5% contingency on concept-only estimates"} />
+            <textarea name="estRateNotes" rows={8} className="input" defaultValue={p.rateNotes || DEFAULT_RATE_NOTES} placeholder={"e.g.\nPlasterboard partition to ceiling, 2 sides + insulation: $145/m²\nGP consult room joinery (base + overhead): $4,800 each\nSupervision: $2,800/week; typical GP clinic program 8-10 weeks\nAlways allow acoustic insulation to consult room walls\nUse 5% contingency on concept-only estimates"} />
             <button className="btn-ghost">Save house rates</button>
           </form>
         </details>

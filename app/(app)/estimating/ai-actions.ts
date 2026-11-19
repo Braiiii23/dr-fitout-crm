@@ -69,8 +69,7 @@ export async function applyEstimate(fd: FormData) {
   catch (e) { return back(id, "err", (e as Error).message); }
   await audit(u.email, "AI estimate used", "Lead", id, `${r.trades} trades, ${r.scope} scope items`);
   revalidatePath(`/estimating/${id}`); revalidatePath("/estimating");
-  const extra = [!r.otherSet && "other costs", !r.contSet && "contingency"].filter(Boolean);
-  back(id, "msg", `Trade pack filled: ${r.trades} trade prices and ${r.scope} new scope items.${extra.length ? ` Your existing ${extra.join(" and ")} were kept.` : ""}`);
+  redirect(`/estimating/${id}/sheet?msg=${enc(`Estimate sheet filled: ${r.lines} lines across ${r.trades} bands, ${r.scope} new scope items, and the trade pack updated.`)}`);
 }
 
 export async function saveRateNotes(fd: FormData) {

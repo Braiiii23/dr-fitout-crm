@@ -6,11 +6,12 @@ import { requireUser } from "@/lib/auth";
 import { BRANDS } from "@/lib/constants";
 import { fmtAUD } from "@/lib/money";
 import { fmtDate } from "@/lib/time";
-import { estPercent, nextStep, summariseTrades, scopeCoverage, COVERAGE_LABEL, TRADES, TRADE_STATUSES } from "@/lib/estimating";
+import { estPercent, nextStep, summariseTrades, scopeCoverage, COVERAGE_LABEL, TRADES, TRADE_STATUSES, BANDS } from "@/lib/estimating";
 import PrintButton from "@/components/PrintButton";
 import { addTradeQuote, updateTradeQuote, deleteTradeQuote } from "../trade-actions";
 import { addScopeItems, updateScopeItem, deleteScopeItem } from "../scope-actions";
 import { saveJobEstimate } from "../actions";
+import { quoteToSheet } from "../sheet-actions";
 import { jobEstimate } from "@/lib/job-estimate";
 import QuoteJobFields from "@/components/QuoteJobFields";
 import { updateQuoteDetails } from "../actions";
@@ -48,6 +49,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
   const goal = settings?.grossMarginGoal ?? 25;
   const concepts = await prisma.concept.findMany({ where: { status: { not: "Archived" } }, orderBy: { name: "asc" }, select: { id: true, name: true } });
   let aiEst: AiEstimate | null = null; try { aiEst = job.aiEstimate ? JSON.parse(job.aiEstimate) : null; } catch { aiEst = null; }
+  if (aiEst && !aiEst.trades?.every((t) => t.lines.every((l) => typeof l.source === "string"))) aiEst = null; // made before the estimate sheet: run again
   const canEditEst = !!viewer && ["ADMIN", "ESTIMATOR", "ACCOUNTS"].includes(viewer.role);
   const scopeTrades = [...new Set(scope.rows.map((r) => r.item.trade))];
   const pct = estPercent(job); const nx = nextStep(job);
@@ -55,7 +57,11 @@ export default async function TradePack({ params, searchParams }: { params: Prom
 
   return (
     <div className="est tp space-y-5" data-brand={job.brand}>
-      <div className="no-print"><Link prefetch={false} href="/estimating" className="est-open" style={{ marginLeft: 0 }}>← Estimating board</Link></div>
+      <div className="no-print flex flex-wrap items-center gap-3">
+        <Link prefetch={false} href="/estimating" className="est-open" style={{ marginLeft: 0 }}>← Estimating board</Link>
+        <Link prefetch={false} href={`/estimating/${job.id}/sheet`} className="est-open">Estimate sheet →</Link>
+        <Link prefetch={false} href={`/estimating/${job.id}/proposal`} className="est-open">Proposal →</Link>
+      </div>
 
       <header className="tp-head">
         <div className="min-w-0">
@@ -175,7 +181,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
                     <td>{r.counts?.company ?? "—"}</td>
                     <td className="tp-scope">{r.counts?.scope ?? "—"}</td>
                     <td className="tp-price">{r.counts?.price != null ? fmtAUD(r.counts.price) : "—"}</td>
-                    <td><span className={`tp-basis tp-basis-${r.basis === "Accepted" ? "acc" : r.basis === "Waiting" ? "wait" : r.basis === "AI estimate" ? "ai" : "low"}`}>{r.basis}{r.waiting ? ` · ${r.waiting} waiting` : ""}</span></td>
+                    <td><span className={`tp-basis tp-basis-${r.basis === "Accepted" ? "acc" : r.basis === "Waiting" ? "wait" : r.basis === "AI estimate" || r.basis.startsWith("Estimate kept") ? "ai" : "low"}`}>{r.basis}{r.waiting ? ` · ${r.waiting} waiting` : ""}</span>{r.basis === "Quote higher than estimate" && canEditEst && r.quotes.some((q) => q.status === "AI estimate") && <form action={quoteToSheet} className="mt-1 no-print"><input type="hidden" name="quoteId" value={r.counts!.id} /><button className="es-add">Put on sheet</button></form>}{r.lowerQuote && <div className="text-xs admin-muted mt-1">Lower quote {fmtAUD(r.lowerQuote.price ?? 0)}{r.lowerQuote.company ? ` from ${r.lowerQuote.company}` : ""}: keep for procurement</div>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -183,7 +189,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
             </table>
           </div>
         )}
-        <p className="tp-foot">Each trade counts its <b>Accepted</b> quote, or the lowest received price if none is accepted yet, or Claude&apos;s <b>AI estimate</b> until a real quote comes in. Prices ex GST.</p>
+        <p className="tp-foot">Each trade counts its <b>Accepted</b> quote, or the lowest received price. Where the estimate sheet has priced a band, a real quote <b>higher</b> than the estimate replaces it; a <b>lower</b> quote doesn&apos;t (the estimate price stays and the lower quote is kept for procurement). Prices ex GST.</p>
       </section>
 
       {/* Job cost and gross profit estimate */}
@@ -261,7 +267,7 @@ export default async function TradePack({ params, searchParams }: { params: Prom
         </form>
       </section>
 
-      <datalist id="trade-list">{TRADES.map((t) => <option key={t} value={t} />)}</datalist>
+      <datalist id="trade-list">{[...BANDS, ...TRADES.filter((t) => !BANDS.includes(t))].map((t) => <option key={t} value={t} />)}</datalist>
     </div>
   );
 }

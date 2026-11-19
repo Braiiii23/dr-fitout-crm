@@ -115,6 +115,9 @@ model Lead {
   estContingencyPct    Float?    // estimator: contingency % on trade + other costs
   estFiles             String?   // JSON [{id, name, kind: plans|photo|other, added, type}] for the AI estimate
   estBrief             String?   // what the client wants, for the AI estimate
+  estMarginPct         Float?    // this job's margin on cost (blank = the default in settings)
+  estProposal          String?   // JSON: proposal header fields, exclusions, assumptions, notes
+  estimateLines        EstimateLine[]
   aiEstimate           String?   // JSON: Claude's latest estimate (see lib/estimate-ai.ts)
   aiEstimateAt         DateTime?
   xeroContact          String?   // the client's contact name in Xero, when it isn't matched automatically
@@ -241,6 +244,28 @@ model TradeQuote {
   @@index([leadId])
 }
 
+/// One row of a job's estimate sheet (the in-app version of the GROK estimate workbook). Cost = qty x (supply + install) ex GST.
+model EstimateLine {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  band        String              // Preliminaries | Demolition | New Construction | ... (lib/estimating BANDS)
+  item        String              // internal description
+  clientText  String?             // proposal wording, e.g. "Supply and install 22 x LED downlights"
+  qty         Float    @default(1)
+  unit        String?             // lm, m2, ea, hr, item
+  supplyRate  Float    @default(0)  // material $/unit ex GST at cost
+  installRate Float    @default(0)  // labour $/unit ex GST at cost
+  source      String   @default("ESTIMATE") // QUOTE | JUSTIN | PAST JOB | XERO | ESTIMATE
+  sourceNote  String?             // where the rate came from
+  provisional Boolean  @default(false) // provisional sum
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([leadId, band])
+}
+
 /// One line of a job's master scope of works. Coverage comes from the trade quotes for its trade.
 model ScopeItem {
   id          String   @id @default(cuid())
@@ -284,7 +309,8 @@ model XeroSnapshot {
 model AccountsSettings {
   id                  String  @id @default("settings")
   monthlyTarget       Float   @default(1000000)
-  estRateNotes        String? // house rates and rules Claude uses for every AI estimate
+  estRateNotes        String? // house rates and rules Claude uses for every AI estimate (blank = the built-in standard rates)
+  estMarginPct        Float   @default(35) // master margin on cost for estimates; Preliminaries and Misc at cost
   grossMarginGoal     Float   @default(25)
   netMarginGoal       Float   @default(9)
   bufferAmount        Float   @default(45000)
