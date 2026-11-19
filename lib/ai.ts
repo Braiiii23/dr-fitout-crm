@@ -67,3 +67,42 @@ export function jsonFrom<T = unknown>(text: string): T {
   if (a < 0 || b < a) throw new Error("Claude didn't send back JSON.");
   return JSON.parse(text.slice(a, b + 1)) as T;
 }
+
+// ---------- Tool use: Claude can call our tools (look things up, prepare changes) before answering ----------
+export type AiTool = { name: string; description: string; input_schema: Record<string, unknown> };
+type Block = { type: string; text?: string; id?: string; name?: string; input?: unknown; [k: string]: unknown };
+
+/** Runs Claude with tools until it gives a final answer (or maxSteps). onTool returns the text Claude sees as the tool's result. */
+export async function aiToolChat(o: { feature: AiFeature; system: string; messages: AiMsg[]; tools: AiTool[]; onTool: (name: string, input: Record<string, unknown>) => Promise<string>; maxSteps?: number; maxTokens?: number; effort?: "low" | "medium" | "high" }): Promise<{ text: string; model: string }> {
+  const c = aiConfig();
+  if (!c) throw new Error("Claude isn't set up. Add ANTHROPIC_API_KEY on the server.");
+  const msgs: { role: "user" | "assistant"; content: unknown }[] = o.messages.map((m) => ({ role: m.role, content: m.content }));
+  let tokensIn = 0, tokensOut = 0; const t0 = Date.now();
+  for (let step = 0; step < (o.maxSteps ?? 8); step++) {
+    const res = await fetch(`${c.base}/v1/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": c.key, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: c.model, system: o.system, max_tokens: o.maxTokens ?? 4000, output_config: { effort: o.effort ?? "low" }, tools: o.tools, messages: msgs }),
+      signal: AbortSignal.timeout(90000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { content?: Block[]; stop_reason?: string; error?: { message?: string }; usage?: { input_tokens?: number; output_tokens?: number } };
+    if (!res.ok) throw new Error(body.error?.message ?? `Claude returned an error (${res.status})`);
+    tokensIn += body.usage?.input_tokens ?? 0; tokensOut += body.usage?.output_tokens ?? 0;
+    const content = body.content ?? [];
+    const calls = content.filter((b) => b.type === "tool_use");
+    if (body.stop_reason !== "tool_use" || !calls.length) {
+      await audit("claude-ai", "ai call", o.feature, undefined, `${c.model} · ${((Date.now() - t0) / 1000).toFixed(1)}s · ${step + 1} step(s) · ${tokensIn} in / ${tokensOut} out tokens`).catch(() => {});
+      return { text: content.filter((b) => b.type === "text").map((b) => b.text ?? "").join("").trim(), model: c.model };
+    }
+    msgs.push({ role: "assistant", content }); // passed back unchanged (thinking blocks included)
+    const results = [];
+    for (const call of calls) {
+      let out: string; let isError = false;
+      try { out = await o.onTool(String(call.name), (call.input ?? {}) as Record<string, unknown>); }
+      catch (e) { out = `Error: ${(e as Error).message}`; isError = true; }
+      results.push({ type: "tool_result", tool_use_id: call.id, content: out.slice(0, 60000), ...(isError ? { is_error: true } : {}) });
+    }
+    msgs.push({ role: "user", content: results });
+  }
+  throw new Error("That took too many steps. Try asking for one thing at a time.");
+}

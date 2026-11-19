@@ -715,3 +715,14 @@ model NoticeReply {
   createdAt  DateTime @default(now())
   @@index([noticeId])
 }
+
+/// Changes the Ask assistant has prepared for a person, waiting for them to press Apply.
+model AiPendingChange {
+  id        String   @id @default(cuid())
+  userId    String
+  ops       String                    // JSON [{kind: "create"|"update", table, id?, data, label, details}]
+  status    String   @default("pending") // pending | applied | cancelled
+  result    String?
+  createdAt DateTime @default(now())
+  @@index([userId, status])
+}

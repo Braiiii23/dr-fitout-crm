@@ -10,18 +10,19 @@ import { ensureJobForLead } from "./job-from-lead";
 // Not allowed: deleting anything, changing the software, logins/passwords (User), and the Xero / BuilderTrend connections and settings store.
 // Used by two doors: the Claude connector (/api/mcp, CLAUDE_CONNECTOR_KEY) and the Grok API (/api/grok, GROK_ADMIN_KEY).
 // Every change is recorded in the audit log as "claude" or "grok".
-export type Actor = { id: "claude" | "grok"; label: "Claude" | "Grok"; keyVar: "CLAUDE_CONNECTOR_KEY" | "GROK_ADMIN_KEY"; door: string };
+export type Actor = { id: string; label: string; keyVar?: "CLAUDE_CONNECTOR_KEY" | "GROK_ADMIN_KEY"; door: string };
 export const CLAUDE: Actor = { id: "claude", label: "Claude", keyVar: "CLAUDE_CONNECTOR_KEY", door: "The Claude connector" };
 export const GROK: Actor = { id: "grok", label: "Grok", keyVar: "GROK_ADMIN_KEY", door: "Grok access" };
 
 const hits: Record<string, number[]> = { claude: [], grok: [] };
 /** Checks the connector key. Returns an error message, or null when the request may go ahead. */
 export function agentAuthError(req: Request, actor: Actor): { status: number; error: string } | null {
+  if (!actor.keyVar) return { status: 403, error: "No outside access for this actor." };
   const key = process.env[actor.keyVar] ?? "";
   if (key.length < 24) return { status: 503, error: `${actor.door} is switched off (${actor.keyVar} isn't set).` };
   const got = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim() || (req.headers.get("x-api-key") ?? "").trim();
   if (!got || !timingSafeEqual(createHash("sha256").update(got).digest(), createHash("sha256").update(key).digest())) return { status: 401, error: "Unauthorised" };
-  const h = hits[actor.id]; const now = Date.now(); while (h.length && now - h[0] > 60000) h.shift(); h.push(now);
+  const h = (hits[actor.id] ??= []); const now = Date.now(); while (h.length && now - h[0] > 60000) h.shift(); h.push(now);
   if (h.length > 240) return { status: 429, error: "Too many requests: slow down to 240 a minute." };
   return null;
 }

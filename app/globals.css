@@ -1664,3 +1664,24 @@ main { padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !importan
 .concept-rooms td:first-child { width:2.6rem; white-space:nowrap; }
 .concept-rooms td:last-child { width:4.6rem; white-space:nowrap; }
 .fit-entry { margin:.35rem .3rem 0; font-size:.75rem; color:#4b3a63; }
+
+/* Assistant: changes waiting for Apply */
+.aw-turn { display: contents; }
+.aw-changes { align-self: stretch; background: #1d1d22; border: 1px solid #3a3a42; border-radius: 12px; padding: .6rem .7rem; font-size: .84rem; }
+.aw-changes-pending { border-color: #f2a900; }
+.aw-changes-done { border-color: #22a06b; }
+.aw-changes-cancelled { opacity: .6; }
+.aw-changes-head { font-weight: 700; margin-bottom: .35rem; }
+.aw-changes ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55rem; }
+.aw-changes table { width: 100%; border-collapse: collapse; margin-top: .25rem; }
+.aw-changes th { text-align: left; font-weight: 500; color: #a1a1aa; padding: .1rem .5rem .1rem 0; vertical-align: top; white-space: nowrap; }
+.aw-changes td { padding: .1rem 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.aw-changes s { color: #a1a1aa; }
+.aw-reason { color: #c4c4cc; font-size: .8rem; }
+.aw-ok { color: #4ade80; } .aw-bad { color: #fca5a5; }
+.aw-ok a { color: #f2a900; }
+.aw-changes-btns { display: flex; gap: .5rem; margin-top: .6rem; }
+.aw-apply, .aw-cancel { border-radius: 10px; padding: .45rem .9rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; min-height: 40px; }
+.aw-apply { background: #f2a900; color: #17171a; }
+.aw-cancel { background: transparent; color: inherit; border-color: #3a3a42; }
+.aw-apply:disabled, .aw-cancel:disabled { opacity: .6; cursor: default; }
