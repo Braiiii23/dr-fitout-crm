@@ -27,6 +27,11 @@ if [ -n "$PASSWORD_RESET" ] && [ ! -f "$DATA_DIR/.password-reset-$PASSWORD_RESET
   touch "$DATA_DIR/.password-reset-$PASSWORD_RESET"
 fi
 
+# One-off reset of a single login: set RESET_LOGIN, RESET_PASSWORD and a new RESET_ID; runs once per RESET_ID.
+if [ -n "$RESET_ID" ] && [ ! -f "$DATA_DIR/.login-reset-$RESET_ID" ]; then
+  node_modules/.bin/tsx scripts/reset-login.ts && touch "$DATA_DIR/.login-reset-$RESET_ID"
+fi
+
 if [ -n "$GROSS_MARGIN_GOAL" ] && [ ! -f "$DATA_DIR/.gm-goal-$GROSS_MARGIN_GOAL" ]; then
   echo "Setting gross margin goal to $GROSS_MARGIN_GOAL%"
   node_modules/.bin/tsx scripts/set-gm-goal.ts && touch "$DATA_DIR/.gm-goal-$GROSS_MARGIN_GOAL"
